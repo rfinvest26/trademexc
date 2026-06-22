@@ -1,5 +1,5 @@
-import type { TradeRealtimeChannel, WithdrawRequestRow } from '@mainbot/trade-shared';
-import { removeChannelDeferred, subscribeToRowUpdates } from '@mainbot/trade-shared';
+import type { TradeRealtimeChannel, WithdrawRequestRow } from '../shared';
+import { removeChannelDeferred, subscribeToRowUpdates } from '../shared';
 import {
   clearPendingWithdrawSession,
   clearStoredRequest,

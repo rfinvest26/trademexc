@@ -1,4 +1,4 @@
-import type { WorkerNotificationEvent } from '@mainbot/trade-shared';
+import type { WorkerNotificationEvent } from './shared';
 import { supabase } from './supabase';
 
 const TRADE_LIKE_EVENTS = new Set<string>([

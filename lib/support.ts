@@ -1,5 +1,5 @@
-import type { SupportMessageRow, TradeRealtimeChannel } from '@mainbot/trade-shared';
-import { removeChannelDeferred, subscribeToTableChanges } from '@mainbot/trade-shared';
+import type { SupportMessageRow, TradeRealtimeChannel } from './shared';
+import { removeChannelDeferred, subscribeToTableChanges } from './shared';
 import { supabase } from './supabase';
 
 export type SupportMessageAuthor = 'user' | 'agent';

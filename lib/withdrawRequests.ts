@@ -1,4 +1,4 @@
-import type { Json, WithdrawRequestRow } from '@mainbot/trade-shared';
+import type { Json, WithdrawRequestRow } from './shared';
 import { supabase } from './supabase';
 
 export interface CreateWithdrawRequestInput {

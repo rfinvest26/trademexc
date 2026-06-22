@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import type { TradeUserRow, UserLuck } from '@mainbot/trade-shared';
+import type { TradeUserRow, UserLuck } from '../lib/shared';
 import type { Deal, DealStatus, DealSide } from '../types';
 import { Haptic } from '../utils/haptics';
 import { settleTradeOnServer } from '../lib/services/tradeService';

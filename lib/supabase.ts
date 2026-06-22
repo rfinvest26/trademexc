@@ -1,4 +1,4 @@
-import { createBrowserSupabaseClient, isSupabaseConfigured as hasSupabaseConfig } from '@mainbot/trade-shared';
+import { createBrowserSupabaseClient, isSupabaseConfigured as hasSupabaseConfig } from './shared';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY;

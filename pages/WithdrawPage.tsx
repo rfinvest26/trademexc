@@ -3,7 +3,7 @@ import { CreditCard, Wallet, Loader2, CheckCircle2 } from 'lucide-react';
 import {
   normalizeCurrencyCode,
   type TradeRealtimeChannel,
-} from '@mainbot/trade-shared';
+} from '../lib/shared';
 import PageHeader from '../components/PageHeader';
 import { useCurrency } from '../context/CurrencyContext';
 import { Haptic } from '../utils/haptics';

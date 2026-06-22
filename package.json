@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@mainbot/trade-shared": "file:../packages/trade-shared",
+    "@supabase/supabase-js": "^2.47.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.40.0",
     "html5-qrcode": "^2.3.8",

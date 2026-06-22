@@ -1,7 +1,7 @@
 import { supabase } from '../supabase';
 import { ensureSupportThread, createSupportMessage, listSupportMessages, subscribeToSupportMessages, touchSupportThread } from '../support';
 import type { SupportMessageRecord } from '../support';
-import type { TradeRealtimeChannel } from '@mainbot/trade-shared';
+import type { TradeRealtimeChannel } from '../shared';
 
 export type P2PChatMessage = SupportMessageRecord;
 

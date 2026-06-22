@@ -1,4 +1,4 @@
-import type { OpenTradeRequestPayload, OpenTradeResponseData } from '@mainbot/trade-shared';
+import type { OpenTradeRequestPayload, OpenTradeResponseData } from './shared';
 import type { Deal } from '../types';
 import { supabase } from './supabase';
 import { ApiClientError } from './apiClient';

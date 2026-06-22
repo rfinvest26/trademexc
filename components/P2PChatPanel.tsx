@@ -9,7 +9,7 @@ import {
   removeP2PChatChannel,
   type P2PChatMessage,
 } from '../lib/services/p2pChatService';
-import type { TradeRealtimeChannel } from '@mainbot/trade-shared';
+import type { TradeRealtimeChannel } from '../lib/shared';
 import { Haptic } from '../utils/haptics';
 import { useToast } from '../context/ToastContext';
 

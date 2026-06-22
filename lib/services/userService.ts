@@ -4,11 +4,11 @@ import type {
   TradeSettingsRow,
   TradeUserRow,
   WithdrawTemplateRow,
-} from '@mainbot/trade-shared';
+} from '../shared';
 import {
   removeChannelDeferred,
   subscribeToRowUpdates,
-} from '@mainbot/trade-shared';
+} from '../shared';
 import { ServiceError } from '../errors';
 import { supabase } from '../supabase';
 

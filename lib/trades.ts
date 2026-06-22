@@ -1,4 +1,4 @@
-import type { TradeTableRow } from '@mainbot/trade-shared';
+import type { TradeTableRow } from './shared';
 import { Deal, DealStatus, type ForcedOutcome } from '../types';
 
 export type TradeRow = TradeTableRow;

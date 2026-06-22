@@ -1,5 +1,5 @@
-import type { P2PDealRow as SharedP2PDealRow, TradeRealtimeChannel } from '@mainbot/trade-shared';
-import { removeChannelDeferred, subscribeToTableChanges } from '@mainbot/trade-shared';
+import type { P2PDealRow as SharedP2PDealRow, TradeRealtimeChannel } from './shared';
+import { removeChannelDeferred, subscribeToTableChanges } from './shared';
 import { supabase } from './supabase';
 
 export type P2PDealRow = SharedP2PDealRow;

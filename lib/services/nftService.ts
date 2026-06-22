@@ -1,4 +1,4 @@
-import { removeChannelDeferred, type TradeRealtimeChannel } from '@mainbot/trade-shared';
+import { removeChannelDeferred, type TradeRealtimeChannel } from '../shared';
 import { supabase } from '../supabase';
 import { refreshNftListingsFromSupabase } from '../nftSupabase';
 import { fetchReferrerNftPolicies, type NftReferrerPolicies } from '../nftReferrerPricing';

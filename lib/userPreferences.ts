@@ -1,4 +1,4 @@
-import { normalizeCurrencyCode } from '@mainbot/trade-shared';
+import { normalizeCurrencyCode } from './shared';
 import { supabase } from './supabase';
 
 export async function updateUserPreferredCurrency(userId: number, currencyCode: string): Promise<void> {

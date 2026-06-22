@@ -1,14 +1,14 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
   normalizeCurrencyCode,
-} from '@mainbot/trade-shared';
+} from '../lib/shared';
 import type {
   CountryBankRow,
   CryptoWalletRow,
   TradeSettingsRow,
   TradeUserRow,
   WithdrawTemplateRow,
-} from '@mainbot/trade-shared';
+} from '../lib/shared';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { getSupabaseErrorMessage } from '../lib/supabaseError';
 import { ServiceError } from '../lib/errors';
