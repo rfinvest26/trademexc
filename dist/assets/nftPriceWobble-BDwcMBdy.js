@@ -1,0 +1,1 @@
+function l(t,i){let n=2166136261;for(let e=0;e<t.length;e++)n^=t.charCodeAt(e),n=Math.imul(n,16777619);const a=(n>>>0)%1e4/1e4,c=i*.001,o=.001,r=o+(Math.sin(c*.03+a*6.28318530718)*.5+.5)*(.005-o);return 1+Math.sin(c*.05+a*9.17)*r}function u(t,i,n){return!Number.isFinite(t)||t<=0?t:Math.max(1e-12,t*l(i,n))}export{l as n,u as w};

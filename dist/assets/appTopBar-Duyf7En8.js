@@ -1,0 +1,1 @@
+const t="sticky top-0 z-30 w-full shrink-0 bg-background/95 backdrop-blur-md border-b border-white/5",e={paddingTop:"calc(env(safe-area-inset-top, 0px) + 10px)",minHeight:48},p="flex items-center gap-2 w-full min-h-[44px] px-4 pb-2.5 lg:px-6 lg:min-h-[48px] lg:pb-3",a="text-[15px] font-semibold text-textPrimary tracking-tight";export{e as A,t as a,p as b,a as c};
