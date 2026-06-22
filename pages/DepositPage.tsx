@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
-  Loader2, X, CheckCircle2, ChevronDown, BadgeCheck, Star, Clock, Landmark, ShieldCheck, MessageCircle,
+  Loader2, X, CheckCircle2, ChevronDown, BadgeCheck, Star, Clock, Landmark, ShieldCheck, MessageCircle, Search, Check,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import BottomSheet from '../components/BottomSheet';
@@ -907,6 +907,60 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
     </BottomSheet>
   );
 
+  const renderCountryPickerSheet = () => (
+    <BottomSheet
+      open={isCountryModalOpen}
+      onClose={() => { setIsCountryModalOpen(false); setCountrySearch(''); }}
+      title="Выбор страны"
+      closeOnBackdrop
+      variant="fullscreen"
+    >
+      <div className="px-4 pb-2">
+        <div className="relative">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" strokeWidth={2} />
+          <input
+            type="text"
+            autoFocus
+            value={countrySearch}
+            onChange={(e) => setCountrySearch(e.target.value)}
+            placeholder="Поиск страны"
+            className="w-full h-10 pl-9 pr-3 rounded-xl bg-surface text-sm text-textPrimary outline-none placeholder:text-textMuted"
+          />
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-4">
+        {filteredCountries.length === 0 ? (
+          <div className="py-10 text-center text-textMuted text-sm">Страна не найдена</div>
+        ) : (
+          filteredCountries.map((country) => {
+            const flagEmoji = COUNTRY_FLAGS[(country.country_code || '').toUpperCase()] || '🌍';
+            const isSelected = (country.id === p2pCountry?.id);
+            return (
+              <button
+                key={country.id}
+                type="button"
+                onClick={() => {
+                  Haptic.tap();
+                  setP2pCountry(country);
+                  setIsCountryModalOpen(false);
+                  setCountrySearch('');
+                }}
+                className="w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl active:bg-surfaceElevated transition-colors text-left"
+              >
+                <span className="text-[18px] leading-none" aria-hidden>{flagEmoji}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-textPrimary truncate">{country.country_name}</div>
+                  <div className="text-[11px] text-textMuted font-mono">{(country.currency || '').toUpperCase()}</div>
+                </div>
+                {isSelected && <Check size={16} className="text-neon shrink-0" strokeWidth={2.5} />}
+              </button>
+            );
+          })
+        )}
+      </div>
+    </BottomSheet>
+  );
+
   const renderCheckStep = () => (
     <div className="pt-8 px-4 flex flex-col items-center h-full">
       <h2 className="text-lg font-bold text-textPrimary mb-2">{t('confirm_title')}</h2>
@@ -1047,6 +1101,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
         </div>
         {renderCancelConfirmSheet()}
         {renderMerchantConfirmSheet()}
+        {renderCountryPickerSheet()}
       </div>
     </>
   );
