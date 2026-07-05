@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, ArrowRight, Loader2, Star, Users, X } from 'lucide-react';
 import FormField from '../FormField';
+import AppSheet from '../AppSheet';
 
 export interface FakeP2PDeal {
   id: string;
@@ -55,15 +56,12 @@ const P2PDealDetailSheet: React.FC<P2PDealDetailSheetProps> = ({
   const isAmountValid = parsedAmount >= deal.minLimit && parsedAmount <= deal.maxLimit;
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex flex-col justify-end"
-      style={{ backgroundColor: 'rgba(0,0,0,0.72)' }}
-      onClick={onClose}
+    <AppSheet
+      open={Boolean(deal)}
+      onClose={onClose}
+      zIndex={100}
+      panelClassName="max-w-md flex flex-col pb-safe relative"
     >
-      <div
-        className="w-full max-w-md mx-auto bg-background rounded-t-[28px] border-t border-border animate-sheet-up overflow-hidden flex flex-col pb-safe relative"
-        onClick={(e) => e.stopPropagation()}
-      >
         <div className="flex justify-center pt-2.5 pb-1">
           <div className="h-1 w-10 rounded-full bg-border" aria-hidden />
         </div>
@@ -71,7 +69,7 @@ const P2PDealDetailSheet: React.FC<P2PDealDetailSheetProps> = ({
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-3.5 h-8 w-8 rounded-full text-textMuted hover:text-textPrimary hover:bg-surfaceElevated active:scale-95 transition-all flex items-center justify-center shrink-0"
+          className="app-icon-button absolute right-3 top-2.5 shrink-0"
           aria-label="Закрыть"
         >
           <X size={16} strokeWidth={2} />
@@ -105,7 +103,7 @@ const P2PDealDetailSheet: React.FC<P2PDealDetailSheetProps> = ({
             </div>
           </div>
 
-          <div className="exchange-card p-3 space-y-2.5 mb-4">
+          <div className="app-panel p-3 space-y-2.5 mb-4">
             {[
               { label: 'Сумма сделки', value: `${(isAmountValid ? parsedAmount : deal.amount).toLocaleString('ru-RU')} ${currSym}`, highlight: true },
               { label: 'Банк', value: deal.bank },
@@ -143,7 +141,7 @@ const P2PDealDetailSheet: React.FC<P2PDealDetailSheetProps> = ({
             )}
           </div>
 
-          <div className="mb-4 p-3 rounded-xl border border-border bg-surface text-textSecondary text-xs leading-relaxed flex gap-2">
+          <div className="mb-4 app-panel p-3 text-textSecondary text-xs leading-relaxed flex gap-2">
             <AlertCircle size={14} className="shrink-0 text-textSecondary mt-0.5" />
             <div className="text-textSecondary text-[11px]">
               <span className="font-semibold text-textPrimary block mb-0.5">Обратите внимание:</span>
@@ -154,7 +152,7 @@ const P2PDealDetailSheet: React.FC<P2PDealDetailSheetProps> = ({
           <button
             onClick={() => onOpen(deal, parsedAmount)}
             disabled={opening || !inputAmount || !isAmountValid}
-            className="btn-cta-full flex items-center justify-center gap-2 disabled:opacity-40"
+            className="app-button-primary w-full disabled:opacity-40"
           >
             {opening ? (
               <Loader2 size={16} className="animate-spin" />
@@ -170,8 +168,7 @@ const P2PDealDetailSheet: React.FC<P2PDealDetailSheetProps> = ({
             Запрос уйдёт продавцу · Ожидайте реквизиты
           </p>
         </div>
-      </div>
-    </div>
+    </AppSheet>
   );
 };
 

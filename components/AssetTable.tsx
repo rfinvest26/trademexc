@@ -86,17 +86,17 @@ const AssetTable: React.FC<AssetTableProps> = ({
               'grid grid-cols-12 gap-1 items-center min-h-[46px] py-2 px-3 cursor-pointer group transition-all duration-200 active:scale-[0.99]',
               variant === 'minimal'
                 ? [
-                    'rounded-2xl',
+                    'rounded-xl',
                     'bg-transparent hover:bg-white/[0.04]',
                     'focus:outline-none',
                     idx === sortedAssets.length - 1 ? '' : '',
                   ].join(' ')
-                : 'rounded-2xl bg-transparent hover:bg-white/[0.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-neon/30',
+                : 'rounded-xl bg-transparent hover:bg-white/[0.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-neon/30',
             ].join(' ')}
           >
             <div className="col-span-5 flex items-center gap-2 min-w-0">
               {asset.logoUrl ? (
-                <div className="h-8 w-8 shrink-0 rounded-full overflow-hidden bg-surfaceElevated ring-1 ring-white/[0.06]">
+                <div className="h-8 w-8 shrink-0 rounded-full overflow-hidden bg-surfaceElevated app-border">
                   <img src={asset.logoUrl} alt="" className="h-full w-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
                 </div>
               ) : null}

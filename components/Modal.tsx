@@ -1,6 +1,6 @@
 import React from 'react';
-import { Z_INDEX } from '../constants/zIndex';
 import { Haptic } from '../utils/haptics';
+import AppModal from './AppModal';
 
 export interface ModalProps {
   open: boolean;
@@ -25,23 +25,16 @@ const Modal: React.FC<ModalProps> = ({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 flex items-center justify-center bg-black/72 backdrop-blur-sm animate-fade-in"
-      style={{ zIndex: Z_INDEX.modal }}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modal-title"
-      onClick={(e) => {
-        if (closeOnBackdrop !== false && e.target === e.currentTarget) {
-          Haptic.tap();
-          onClose();
-        }
+    <AppModal
+      open={open}
+      onClose={() => {
+        Haptic.tap();
+        onClose();
       }}
+      closeOnBackdrop={closeOnBackdrop !== false}
+      labelledBy="modal-title"
+      panelClassName="max-w-xs px-4 pt-4 pb-3"
     >
-      <div
-        className="w-full max-w-xs bg-surfaceElevated rounded-2xl shadow-2xl px-4 pt-4 pb-3 ring-1 ring-white/5"
-        onClick={(e) => e.stopPropagation()}
-      >
         <h2
           id="modal-title"
           className="text-base font-semibold text-textPrimary mb-2 min-h-[24px]"
@@ -51,8 +44,7 @@ const Modal: React.FC<ModalProps> = ({
         <div className="text-sm text-textSecondary mb-4">
           {children}
         </div>
-      </div>
-    </div>
+    </AppModal>
   );
 };
 

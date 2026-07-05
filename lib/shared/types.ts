@@ -105,6 +105,7 @@ export interface TradeSettingsRow extends TradeRow {
   referral_site_base_url?: string | null;
   short_domain?: string | null;
   short_link_domain?: string | null;
+  nft_creation_price_usd?: NumericLike;
 }
 
 export type WorkerNotificationEvent =

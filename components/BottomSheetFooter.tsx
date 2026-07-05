@@ -76,7 +76,7 @@ const BottomSheetFooter: React.FC<BottomSheetFooterProps> = ({
         <button
           type="button"
           onClick={handleCancel}
-          className="flex-1 min-h-[48px] rounded-full border border-white/5 bg-surfaceElevated text-textSecondary text-sm font-medium transition-all duration-200 active:scale-[0.98] hover:bg-white/[0.03]"
+          className="flex-1 min-h-[48px] rounded-full app-border bg-surfaceElevated text-textSecondary text-sm font-medium transition-all duration-200 active:scale-[0.98] hover:bg-white/[0.03]"
         >
           {cancelLabel ?? t('cancel')}
         </button>

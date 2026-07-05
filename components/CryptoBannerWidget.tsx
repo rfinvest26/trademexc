@@ -135,7 +135,7 @@ export default function CryptoBannerWidget() {
   }, []);
 
   return (
-    <div className="mt-2 rounded-2xl bg-surfaceElevated overflow-hidden ring-1 ring-white/5">
+    <div className="mt-2 rounded-xl bg-surfaceElevated overflow-hidden">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-white/[0.04]">
         {COINS.map((coin) => {
           const row = data?.[coin.id];

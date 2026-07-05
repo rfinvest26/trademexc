@@ -5,7 +5,7 @@ import type { CSSProperties } from 'react';
  * Специализация страницы — содержимое внутри APP_TOP_BAR_ROW.
  */
 export const APP_TOP_BAR_CLASS =
-  'sticky top-0 z-30 w-full shrink-0 bg-background/95 backdrop-blur-md border-b border-white/5';
+  'sticky top-0 z-30 w-full shrink-0 bg-background/95 backdrop-blur-md border-b border-border';
 
 export const APP_TOP_BAR_STYLE: CSSProperties = {
   paddingTop: 'calc(env(safe-area-inset-top, 0px) + 10px)',

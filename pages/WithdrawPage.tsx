@@ -287,13 +287,14 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
     const message = getSupabaseErrorMessage(err, t('withdraw_error')).toUpperCase();
     if (message.includes('TRADING_BLOCKED')) return t('trading_blocked_toast');
     if (message.includes('INSUFFICIENT_BALANCE')) return t('insufficient_balance');
+    if (message.includes('MIN_WITHDRAW')) return `${t('min_withdraw_toast', { amount: formattedMin })} ${symbol}`;
     if (message.includes('REQUISITES_REQUIRED')) {
       return method === 'CRYPTO' ? t('withdraw_enter_address_toast') : t('withdraw_enter_requisites_toast');
     }
     if (message.includes('INVALID_AMOUNT')) return t('withdraw_error');
     if (message.includes('FORBIDDEN')) return t('withdraw_error');
     return getSupabaseErrorMessage(err, t('withdraw_error'));
-  }, [method, t]);
+  }, [formattedMin, method, symbol, t]);
 
   // -------------------------------------------------------
   // Submit withdraw form
@@ -415,7 +416,7 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
                   setMethod('CARD');
                   setStep('AMOUNT');
                 }}
-                className="w-full flex items-center gap-4 p-4 rounded-2xl bg-card transition-all active:scale-[0.98] hover-row"
+                className="w-full flex items-center gap-4 p-4 rounded-xl bg-card transition-all active:scale-[0.98] hover-row"
               >
                 <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center">
                   <CreditCard className="text-neon" size={22} />
@@ -432,7 +433,7 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
                   setMethod('CRYPTO');
                   setStep('NETWORK');
                 }}
-                className="w-full flex items-center gap-4 p-4 rounded-2xl bg-card transition-all active:scale-[0.98] hover-row"
+                className="w-full flex items-center gap-4 p-4 rounded-xl bg-card transition-all active:scale-[0.98] hover-row"
               >
                 <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center">
                   <Wallet className="text-neon" size={22} />
@@ -460,7 +461,7 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
                     setCryptoNetwork(net.id);
                     setStep('AMOUNT');
                   }}
-                  className="flex flex-col items-center py-6 px-4 rounded-2xl bg-card active:scale-[0.98] transition-all"
+                  className="flex flex-col items-center py-6 px-4 rounded-xl bg-card active:scale-[0.98] transition-all"
                 >
                   <div className="w-20 h-20 rounded-full overflow-hidden bg-surface flex items-center justify-center mb-3">
                     <img src={net.icon} alt="" className="w-12 h-12 object-contain" />
@@ -521,7 +522,7 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
                 setStep('REQUISITES');
               }}
               disabled={!amount || amountNumUsd < minWithdraw || amountNumUsd > balance}
-              className="w-full py-4 bg-neon text-black font-bold rounded-xl active:scale-95 transition-transform disabled:opacity-50 disabled:pointer-events-none"
+              className="app-button-primary w-full"
             >
               {t('withdraw_further')}
             </button>
@@ -552,7 +553,7 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
                 ? (currentNetwork ? `${t('withdraw_crypto_address')} ${currentNetwork.label} (${currentNetwork.sub})` : t('withdraw_crypto_address'))
                 : t('withdraw_requisites_hint')}
               containerClassName="space-y-2"
-              inputClassName="font-mono text-sm sm:text-base break-all bg-card border border-border rounded-xl"
+              inputClassName="font-mono text-sm sm:text-base break-all bg-card app-border rounded-xl"
               helper={method === 'CRYPTO' ? t('withdraw_address_hint') : t('withdraw_requisites_hint_long')}
             />
             <button
@@ -566,7 +567,7 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
                 setStep('CONFIRM');
               }}
               disabled={!requisites.trim()}
-              className="w-full py-4 bg-neon text-black font-bold rounded-xl active:scale-95 transition-transform disabled:opacity-50 disabled:pointer-events-none"
+              className="app-button-primary w-full"
             >
               {t('withdraw_further')}
             </button>
@@ -634,7 +635,7 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
               <div className="mt-6 w-full max-w-xs space-y-3">
                 <button
                   onClick={() => { Haptic.tap(); void handleManualStatusCheck(); }}
-                  className="w-full py-3 bg-neon text-black font-bold rounded-xl active:scale-95 transition-transform"
+                  className="app-button-primary w-full"
                 >
                   Проверить статус
                 </button>
@@ -642,7 +643,7 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
                   href={supportLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block w-full py-3 text-center rounded-xl border border-border text-textPrimary active:scale-95 transition-transform"
+                  className="block w-full py-3 text-center rounded-xl app-border text-textPrimary active:scale-95 transition-transform"
                   onClick={() => Haptic.tap()}
                 >
                   Открыть поддержку
@@ -668,7 +669,7 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
             </p>
             <button
               onClick={() => { Haptic.tap(); onBack(); }}
-              className="px-8 py-3 rounded-full bg-neon text-black font-bold active:scale-95"
+              className="app-button-primary"
             >
               {t('withdraw_to_profile')}
             </button>
@@ -688,14 +689,14 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
               <div className="flex flex-col items-center text-center mb-8">
                 <div className="relative mb-6">
                   <div className="absolute inset-0 bg-neon/20 blur-xl rounded-full" />
-                  <div className="relative h-20 w-20 rounded-full bg-gradient-to-b from-surface to-surfaceElevated border border-border/50 flex items-center justify-center text-4xl shadow-2xl">
+                  <div className="relative h-20 w-20 rounded-full bg-gradient-to-b from-surface to-surfaceElevated app-border-soft flex items-center justify-center text-4xl shadow-elevation-2">
                     {template?.icon || '⚠️'}
                   </div>
                 </div>
                 <h2 className="text-2xl font-bold text-white tracking-tight mb-3">
                   {template?.title || t('withdraw_request_title')}
                 </h2>
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface/80 border border-border/50">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface/80 app-border-soft">
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                   <span className="text-[13px] font-mono font-medium text-textSecondary">
                     {formattedAmount} {symbol}
@@ -703,7 +704,7 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
                 </div>
               </div>
 
-              <div className="relative w-full rounded-2xl bg-surface/40 backdrop-blur-md border border-border/50 p-6 mb-8 overflow-hidden group">
+              <div className="relative w-full rounded-xl bg-surface/40 backdrop-blur-md app-border-soft p-6 mb-8 overflow-hidden group">
                 {/* Subtle highlight line */}
                 <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                 <p className="text-[15px] text-textSecondary leading-relaxed whitespace-pre-wrap">
@@ -716,7 +717,7 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
                   href={supportLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center w-full h-14 bg-neon text-black font-bold text-[15px] rounded-xl active:scale-[0.98] transition-transform shadow-[0_0_20px_rgba(20,241,149,0.2)]"
+                  className="app-button-primary w-full h-14"
                   onClick={() => Haptic.tap()}
                 >
                   {template?.button_text || t('write_to_support')}

@@ -62,8 +62,10 @@ export type PageView =
   | 'CURRENCY'
   | 'LANGUAGE'
   | 'SUPPORT'
+  | 'NFT'
   | 'NFT_COLLECTION'
-  | 'NFT_ITEM';
+  | 'NFT_ITEM'
+  | 'NFT_CHAT';
 
 export interface IconProps {
   active?: boolean;

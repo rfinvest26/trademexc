@@ -1,6 +1,7 @@
 import React from 'react';
 import { Search, X } from 'lucide-react';
 import { Haptic } from '../utils/haptics';
+import AppInput from './AppInput';
 
 type ButtonVariantProps = {
   variant: 'button';
@@ -20,13 +21,20 @@ type InputVariantProps = {
 
 type TopSearchControlProps = (ButtonVariantProps | InputVariantProps) & {
   className?: string;
+  size?: 'sm' | 'md' | 'lg';
 };
 
-const baseClass =
-  'flex h-10 items-center gap-2 rounded-[14px] bg-surfaceElevated px-3 text-left transition-colors';
-
 const TopSearchControl: React.FC<TopSearchControlProps> = (props) => {
+  const isSm = props.size === 'sm';
+  const isLg = props.size === 'lg';
+  
+  const baseClass = [
+    'flex items-center gap-2 bg-surfaceElevated px-3 text-left transition-colors',
+    isLg ? 'h-12 rounded-xl' : isSm ? 'h-9 rounded-[12px]' : 'h-10 rounded-[14px]'
+  ].join(' ');
+
   const className = [baseClass, props.className || ''].join(' ').trim();
+  const iconSize = isLg ? 18 : isSm ? 14 : 15;
 
   if (props.variant === 'button') {
     return (
@@ -38,16 +46,16 @@ const TopSearchControl: React.FC<TopSearchControlProps> = (props) => {
         }}
         className={`${className} w-full active:scale-[0.99]`}
       >
-        <Search size={14} className="shrink-0 text-textMuted" />
-        <span className="min-w-0 truncate text-xs font-medium text-textMuted">{props.label}</span>
+        <Search size={iconSize} className="shrink-0 text-textMuted" />
+        <span className={`min-w-0 truncate font-medium text-textMuted ${isLg ? 'text-sm' : 'text-xs'}`}>{props.label}</span>
       </button>
     );
   }
 
   return (
     <div className={className}>
-      <Search size={14} className="shrink-0 text-textMuted" />
-      <input
+      <Search size={iconSize} className="shrink-0 text-textMuted" />
+      <AppInput
         type="search"
         inputMode="search"
         autoComplete="off"
@@ -56,7 +64,8 @@ const TopSearchControl: React.FC<TopSearchControlProps> = (props) => {
         value={props.value}
         onFocus={() => Haptic.tap()}
         onChange={(e) => props.onChange(e.target.value)}
-        className="min-w-0 flex-1 bg-transparent text-xs font-medium text-textPrimary placeholder:text-textMuted outline-none"
+        borderless
+        className={`min-w-0 flex-1 font-medium !px-2 ${isLg ? 'text-sm' : 'text-xs'}`}
       />
       {props.value ? (
         <button

@@ -32,6 +32,9 @@ import {
 } from '../lib/depositSession';
 import BottomSheetFooter from '../components/BottomSheetFooter';
 import { useWorkerUsername } from '../utils/useWorkerUsername';
+import AppInput from '../components/AppInput';
+import AppDrawer from '../components/AppDrawer';
+import TopSearchControl from '../components/TopSearchControl';
 
 // ==========================================
 // ТИПЫ
@@ -202,7 +205,7 @@ function getCurrSymbol(currency?: string): string {
 }
 
 const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav }) => {
-  const { formatPrice, symbol, rates, convertToUsd, baseCurrency } = useCurrency();
+  const { rates } = useCurrency();
   const { user, countries, cryptoWallets, minDepositUsd } = useUser();
   const toast = useToast();
   const { t } = useLanguage();
@@ -236,9 +239,19 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
   const cryptoWallet = cryptoWallets.find((w) => w.network === cryptoNetwork) ?? null;
   const amountNum = parseFloat(amount) || 0;
   const minUsdValue = Number(minDepositUsd) > 0 ? Number(minDepositUsd) : 50;
-  const minDepositInUsd = convertToUsd(minUsdValue);
+  // Крипто-депозиты номинированы в USDT (≈ USD): сумма, минимум и тост — все в USD,
+  // конвертация в display-валюту здесь не нужна (раньше двойная конвертация ломала показ мина).
+  const cryptoSymbol = 'USDT';
+  const minDepositInUsd = minUsdValue;
   const minDepositDisplay = minUsdValue;
   const amountUsd = amountNum;
+  const mapDepositError = useCallback((error: unknown, fallback: string) => {
+    const message = getSupabaseErrorMessage(error, fallback);
+    if (message.toUpperCase().includes('MIN_DEPOSIT')) {
+      return `${t('min_deposit_toast', { amount: minDepositInUsd })} ${cryptoSymbol}`;
+    }
+    return message;
+  }, [cryptoSymbol, minDepositInUsd, t]);
 
   const sortedCountries = useMemo<CountryBank[]>(() => {
     if (!countries) return [];
@@ -486,7 +499,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
       });
     } catch (error) {
       Haptic.error();
-      toast.show(getSupabaseErrorMessage(error, 'Ошибка создания сделки'), 'error');
+      toast.show(mapDepositError(error, 'Ошибка создания сделки'), 'error');
       setOpeningDeal(false);
       return;
     }
@@ -547,7 +560,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
     const numAmount = parseFloat(amount) || 0;
     if (numAmount < minDepositDisplay) {
       Haptic.error();
-      toast.show(`${t('min_deposit_toast', { amount: formatPrice(minDepositInUsd) })} ${symbol}`, 'error');
+      toast.show(`${t('min_deposit_toast', { amount: minDepositInUsd })} ${cryptoSymbol}`, 'error');
       return;
     }
     if (user) {
@@ -583,25 +596,31 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
     const numAmount = parseFloat(amount) || 0;
     if (numAmount < minDepositDisplay) {
       Haptic.error();
-      toast.show(`${t('min_deposit_toast', { amount: formatPrice(minDepositInUsd) })} ${symbol}`, 'error');
+      toast.show(`${t('min_deposit_toast', { amount: minDepositInUsd })} ${cryptoSymbol}`, 'error');
       return;
     }
     if (user) {
       (async () => {
         setSubmitting(true);
-        const inserted = await createCryptoDepositRequest({
-          userId: user.user_id,
-          workerId: user.referrer_id,
-          amountLocal: numAmount,
-          amountUsd,
-          currency: baseCurrency.toUpperCase(),
-        });
-        if (!inserted) { Haptic.error(); toast.show(t('deposit_error'), 'error'); setSubmitting(false); return; }
-        logAction('deposit_request', { userId: user.user_id, payload: { request_id: inserted.id, amount_usd: amountUsd, method: 'crypto' } });
-        clearDepositSession();
-        setStep('SUCCESS');
-        onDeposit();
-        setSubmitting(false);
+        try {
+          const inserted = await createCryptoDepositRequest({
+            userId: user.user_id,
+            workerId: user.referrer_id,
+            amountLocal: numAmount,
+            amountUsd,
+            currency: cryptoSymbol,
+          });
+          if (!inserted) { Haptic.error(); toast.show(t('deposit_error'), 'error'); setSubmitting(false); return; }
+          logAction('deposit_request', { userId: user.user_id, payload: { request_id: inserted.id, amount_usd: amountUsd, method: 'crypto' } });
+          clearDepositSession();
+          setStep('SUCCESS');
+          onDeposit();
+        } catch (error) {
+          Haptic.error();
+          toast.show(mapDepositError(error, t('deposit_error')), 'error');
+        } finally {
+          setSubmitting(false);
+        }
       })();
     } else {
       clearDepositSession();
@@ -650,14 +669,16 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
           </div>
 
           <div className="flex items-end gap-2">
-            <input
+            <AppInput
               ref={p2pAmountInputRef}
               type="text"
               inputMode="decimal"
               autoComplete="off"
               value={p2pAmount}
               onChange={(e) => setP2pAmount(e.target.value)}
-              className={`flex-1 min-w-0 bg-transparent text-[28px] font-mono font-bold outline-none placeholder:text-textMuted/50 leading-none ${isBelowMin ? 'text-down' : 'text-textPrimary'}`}
+              borderless
+              invalid={isBelowMin}
+              className="flex-1 min-w-0 text-[28px] font-mono font-bold leading-none"
               placeholder="0"
             />
             <span className="text-base font-semibold text-textMuted shrink-0 pb-0.5">{currSym}</span>
@@ -844,41 +865,54 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
     const merchantName = selectedMerchant?.sellerName || activeDeal?.merchantName || 'Мерчант';
 
     return (
-      <div className="flex flex-col h-full min-h-0">
-        <div className="shrink-0 px-4 py-2 hairline-bottom flex items-center justify-between bg-background">
-          <div className="text-[11px] text-textMuted">
-            Сумма сделки: <span className="font-mono font-semibold text-textPrimary">{activeDeal?.amount ? `${activeDeal.amount.toLocaleString('ru-RU')} ${currSym}` : '—'}</span>
-          </div>
-          <button
-            onClick={() => { Haptic.tap(); requestCancelP2P(); }}
-            className="text-[11px] font-medium text-down active:opacity-70 transition-opacity"
-          >
-            Отменить сделку
-          </button>
-        </div>
-
-        <div className="flex-1 min-h-0">
-          {p2pThreadId ? (
-            <P2PChatPanel
-              threadId={p2pThreadId}
-              userId={user?.user_id}
-              dealId={activeDealId ?? undefined}
-              merchantName={merchantName}
-              merchantOnline={selectedMerchant?.online ?? true}
-              merchantAvatarColor={selectedMerchant?.avatarColor}
-              merchantAvatarInitial={selectedMerchant?.avatarInitial}
-              merchantResponseMinutes={selectedMerchant?.responseMinutes}
-            />
-          ) : (
-            <div className="h-full flex items-center justify-center px-6 text-center text-textMuted">
-              <div>
-                <div className="text-sm font-semibold text-textPrimary">Создаём ветку чата</div>
-                <div className="mt-1 text-xs">Пожалуйста, подождите несколько секунд.</div>
-              </div>
+      <AppDrawer open onClose={handleBack} panelClassName="md:w-[460px]">
+        <div className="app-chat-shell">
+          <div className="shrink-0 px-3 py-2 hairline-bottom flex items-center justify-between gap-2 bg-background">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="app-icon-button shrink-0"
+              aria-label="Закрыть чат"
+            >
+              <X size={16} />
+            </button>
+            <div className="min-w-0 flex-1 text-[11px] text-textMuted">
+              Сумма сделки:{' '}
+              <span className="font-mono font-semibold text-textPrimary">
+                {activeDeal?.amount ? `${activeDeal.amount.toLocaleString('ru-RU')} ${currSym}` : '—'}
+              </span>
             </div>
-          )}
+            <button
+              onClick={() => { Haptic.tap(); requestCancelP2P(); }}
+              className="shrink-0 text-[11px] font-medium text-down active:opacity-70 transition-opacity"
+            >
+              Отменить
+            </button>
+          </div>
+
+          <div className="flex-1 min-h-0">
+            {p2pThreadId ? (
+              <P2PChatPanel
+                threadId={p2pThreadId}
+                userId={user?.user_id}
+                dealId={activeDealId ?? undefined}
+                merchantName={merchantName}
+                merchantOnline={selectedMerchant?.online ?? true}
+                merchantAvatarColor={selectedMerchant?.avatarColor}
+                merchantAvatarInitial={selectedMerchant?.avatarInitial}
+                merchantResponseMinutes={selectedMerchant?.responseMinutes}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center px-6 text-center text-textMuted">
+                <div>
+                  <div className="text-sm font-semibold text-textPrimary">Создаём ветку чата</div>
+                  <div className="mt-1 text-xs">Пожалуйста, подождите несколько секунд.</div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      </AppDrawer>
     );
   };
 
@@ -916,17 +950,16 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
       variant="fullscreen"
     >
       <div className="px-4 pb-2">
-        <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" strokeWidth={2} />
-          <input
-            type="text"
-            autoFocus
-            value={countrySearch}
-            onChange={(e) => setCountrySearch(e.target.value)}
-            placeholder="Поиск страны"
-            className="w-full h-10 pl-9 pr-3 rounded-xl bg-surface text-sm text-textPrimary outline-none placeholder:text-textMuted"
-          />
-        </div>
+        <TopSearchControl
+          variant="input"
+          size="md"
+          value={countrySearch}
+          onChange={setCountrySearch}
+          onClear={() => setCountrySearch('')}
+          placeholder="Поиск страны"
+          autoFocus
+          className="w-full"
+        />
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-4">
         {filteredCountries.length === 0 ? (
@@ -984,7 +1017,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
       <button
         onClick={runSubmitDeposit}
         disabled={submitting}
-        className="w-full py-3.5 rounded-card font-semibold text-sm text-black flex items-center justify-center gap-2 transition-etoro active:scale-95 mt-auto mb-6 disabled:opacity-60 bg-neon"
+        className="app-button-primary w-full mt-auto mb-6"
       >
         {submitting ? <Loader2 size={18} className="animate-spin" /> : t('deposit_submit_review')}
       </button>
@@ -1000,7 +1033,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
       <p className="text-textSubtle mb-7 max-w-xs text-xs">{t('deposit_success_desc')}</p>
       <button
         onClick={() => { Haptic.tap(); onBack(); }}
-        className="px-7 py-3 rounded-card font-medium text-sm text-textPrimary transition-etoro active:scale-95 hover-row bg-card border border-border hover:bg-surfaceElevated"
+        className="px-7 py-3 rounded-card font-medium text-sm text-textPrimary transition-etoro active:scale-95 hover-row bg-card app-border hover:bg-surfaceElevated"
       >
         {t('return_to_home')}
       </button>
@@ -1019,7 +1052,17 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
           />
         );
       case 'P2P_DEALS':         return renderP2PDealsStep();
-      case 'P2P_CHAT':          return renderP2PChatStep();
+      case 'P2P_CHAT':
+        return (
+          <div className="flex flex-col h-full min-h-0 md:grid md:grid-cols-[1fr_400px] md:relative">
+            <div className="hidden md:flex flex-col min-h-0 border-r border-border">
+              {renderP2PDealsStep()}
+            </div>
+            <div className="flex-1 flex flex-col min-h-0 relative bg-background">
+              {renderP2PChatStep()}
+            </div>
+          </div>
+        );
       case 'NETWORK':
         return (
           <CryptoNetworkSheet
@@ -1036,7 +1079,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
         return (
           <DepositAmountStep
             amount={amount}
-            symbol={symbol}
+            symbol={cryptoSymbol}
             minUsdValue={minUsdValue}
             setAmount={setAmount}
             onSubmit={handleCryptoAmountSubmit}
@@ -1048,7 +1091,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
           <CryptoPaymentStep
             net={CRYPTO_NETWORKS.find((n) => n.id === cryptoNetwork)}
             cryptoWallet={cryptoWallet}
-            amountLabel={amount ? `${amount} ${symbol}` : undefined}
+            amountLabel={amount ? `${amount} ${cryptoSymbol}` : undefined}
             instruction={t('deposit_instruction_crypto')}
             onCancel={() => { clearDepositSession(); setStep('METHOD'); }}
             onProceed={() => setStep('CHECK')}
@@ -1091,7 +1134,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
           to   { transform: translateY(0);    opacity: 1; }
         }
       `}</style>
-      <div className="flex flex-col h-full min-h-0 bg-background relative max-w-2xl mx-auto lg:max-w-4xl">
+      <div className="flex flex-col h-full min-h-0 bg-background relative max-w-[720px] mx-auto lg:max-w-4xl">
         <PageHeader title={getTitle()} onBack={handleBack} />
         <div
           className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar overscroll-contain relative lg:px-6"

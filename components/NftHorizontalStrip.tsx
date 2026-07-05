@@ -43,7 +43,7 @@ const NftHorizontalStrip: React.FC<NftHorizontalStripProps> = ({
               }}
               className={`snap-start shrink-0 w-36 flex flex-col rounded-[16px] overflow-hidden transition-all duration-300 active:scale-[0.97] hover:-translate-y-1 hover:shadow-lg ${
                 isActive
-                  ? 'bg-surface shadow-md ring-1 ring-white/5'
+                  ? 'bg-surface shadow-md'
                   : 'bg-surfaceElevated hover:bg-surface'
               }`}
             >

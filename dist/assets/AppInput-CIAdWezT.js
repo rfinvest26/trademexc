@@ -1,0 +1,1 @@
+import{R as p,b as m}from"./vendor-DIVAN2SE.js";const u=p.forwardRef(({className:a,size:e="md",invalid:s=!1,borderless:t=!1,...r},n)=>p.createElement("input",{ref:n,className:m("app-input",e==="sm"&&"app-input-sm",t&&"app-input-borderless",s&&"app-input-error",a),...r}));u.displayName="AppInput";export{u as A};

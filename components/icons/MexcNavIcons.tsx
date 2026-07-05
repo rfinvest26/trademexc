@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, BarChart2, ArrowLeftRight, Wallet } from 'lucide-react';
+import { Home, BarChart2, ArrowLeftRight, Wallet, Gem } from 'lucide-react';
 
 type IconProps = {
   active?: boolean;
@@ -23,6 +23,10 @@ export const NavMarketsIcon: React.FC<IconProps> = ({ active = false, className 
 
 export const NavTradeIcon: React.FC<IconProps> = ({ active = false, className = '', size = 24 }) => {
   return <ArrowLeftRight size={size} strokeWidth={active ? 2.5 : 2} className={getIconClass(active, className)} />;
+};
+
+export const NavNftIcon: React.FC<IconProps> = ({ active = false, className = '', size = 24 }) => {
+  return <Gem size={size} strokeWidth={active ? 2.5 : 2} className={getIconClass(active, className)} />;
 };
 
 export const NavWalletIcon: React.FC<IconProps> = ({ active = false, className = '', size = 24 }) => {

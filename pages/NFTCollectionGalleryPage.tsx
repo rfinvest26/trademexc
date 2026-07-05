@@ -155,64 +155,54 @@ const NFTCollectionGalleryPage: React.FC<NFTCollectionGalleryPageProps> = ({
 
   return (
     <div className="bg-background animate-fade-in min-h-screen">
-      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-md pb-2 pt-2 border-b border-white/5">
-        <div className="max-w-2xl w-full mx-auto">
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-md pb-2 pt-2 border-b border-border">
+        <div className="w-full px-4 lg:px-8 max-w-[1440px] mx-auto">
           <PageHeader title={collectionName} onBack={onBack} />
         </div>
       </div>
 
-      {/* Premium Hero Header */}
-      <div className="relative w-full overflow-hidden">
-        {/* Background Layer: Blurry cover */}
-        <div className="absolute inset-0 z-0">
-          <img 
-            src={coverUrl} 
-            alt="" 
-            className="w-full h-full object-cover blur-2xl scale-110 opacity-30 saturate-150"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/60 to-background" />
+      {/* Cover banner — wide, full bleed */}
+      <div className="relative w-full h-36 lg:h-52 overflow-hidden">
+        <img
+          src={coverUrl}
+          alt=""
+          className="absolute inset-0 z-10 w-full h-full object-cover object-[center_18%] scale-[1.04] lg:object-[center_14%]"
+          referrerPolicy="no-referrer"
+        />
+        <div className="absolute inset-0 z-20 bg-gradient-to-t from-background via-background/20 via-42% to-transparent" />
+        {/* Avatar overlapping bottom of banner */}
+        <div className="absolute left-5 lg:left-10 bottom-3 lg:bottom-4 z-30 w-16 h-16 lg:w-20 lg:h-20 rounded-xl overflow-hidden border-4 border-background bg-surfaceElevated shadow-xl">
+          <img src={coverUrl} alt={collectionName} className="w-full h-full object-cover object-[center_18%]" />
         </div>
+      </div>
 
-        {/* Content Layer */}
-        <div className="relative z-10 px-4 pt-4 pb-8 flex flex-col items-center text-center">
-          {/* Avatar with Glow */}
-          <div className="relative mb-6">
-            <div className="relative w-24 h-24 rounded-2xl overflow-hidden ring-4 ring-background bg-surfaceElevated shadow-xl">
-              <img 
-                src={coverUrl} 
-                alt={collectionName} 
-                className="w-full h-full object-cover"
-              />
-            </div>
+      {/* Collection info row */}
+      <div className="w-full px-5 lg:px-10 max-w-[1440px] mx-auto pt-6 lg:pt-8 pb-5">
+        <h1 className="text-xl lg:text-2xl font-bold text-textPrimary tracking-tight flex items-center gap-2">
+          {collectionName}
+          <span className="text-accent text-sm">✓</span>
+        </h1>
+
+        {/* Stats row — compact, no heavy container */}
+        <div className="flex items-center gap-6 mt-3 flex-wrap">
+          <div className="stat-cell">
+            <span className="stat-cell-label">Floor</span>
+            <span className="stat-cell-value text-accent">{formatPrice(priceRollup.floor)}</span>
           </div>
-
-          <h1 className="text-2xl font-bold text-white tracking-tight mb-2 drop-shadow-lg">
-            {collectionName}
-          </h1>
-          
-          <p className="text-[10px] font-mono text-textSubtle uppercase tracking-[0.2em] mb-8 opacity-70">
-            {collectionSlug}
-          </p>
-
-          {/* Stats Row */}
-          <div className="flex items-center justify-center bg-surfaceElevated rounded-[16px] p-4 divide-x divide-white/5 shadow-sm">
-            <div className="flex flex-col items-center px-4 sm:px-8">
-              <span className="text-[9px] text-textSubtle uppercase tracking-widest font-bold mb-1">Floor</span>
-              <span className="text-sm font-mono font-bold text-neon">{formatPrice(priceRollup.floor)} <span className="text-[10px] text-textMuted">$</span></span>
-            </div>
-            <div className="flex flex-col items-center px-4 sm:px-8">
-              <span className="text-[9px] text-textSubtle uppercase tracking-widest font-bold mb-1">Items</span>
-              <span className="text-sm font-mono font-bold text-white">{itemCount}</span>
-            </div>
-            <div className="flex flex-col items-center px-4 sm:px-8">
-              <span className="text-[9px] text-textSubtle uppercase tracking-widest font-bold mb-1">Highest</span>
-              <span className="text-sm font-mono font-bold text-white">{formatPrice(priceRollup.high)} <span className="text-[10px] text-textMuted">$</span></span>
-            </div>
+          <div className="w-px h-6 bg-border" />
+          <div className="stat-cell">
+            <span className="stat-cell-label">Items</span>
+            <span className="stat-cell-value">{itemCount}</span>
+          </div>
+          <div className="w-px h-6 bg-border" />
+          <div className="stat-cell">
+            <span className="stat-cell-label">Highest</span>
+            <span className="stat-cell-value">{formatPrice(priceRollup.high)}</span>
           </div>
         </div>
       </div>
 
-      <div className={`max-w-2xl w-full mx-auto px-4 pt-4 space-y-5`}>
+      <div className="w-full px-4 lg:px-8 xl:px-10 pt-2 space-y-4 max-w-[1440px] mx-auto">
         <TopSearchControl
           variant="input"
           value={codeQuery}
@@ -229,7 +219,7 @@ const NFTCollectionGalleryPage: React.FC<NFTCollectionGalleryPageProps> = ({
         {sortedListings.length === 0 ? (
           <p className="text-sm text-textMuted text-center py-14">{t('nothing_found')}</p>
         ) : (
-          <div className="grid grid-cols-3 gap-2.5 pb-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 pb-2">
             {sortedListings.map((row) => (
               <button
                 key={`${row.codeKey}-${row.collectionSlug}`}
@@ -239,7 +229,7 @@ const NFTCollectionGalleryPage: React.FC<NFTCollectionGalleryPageProps> = ({
                   onOpenListing(row);
                 }}
                 aria-label={`${collectionName} ${row.codeDisplay}`}
-                className="group rounded-2xl overflow-hidden bg-surfaceElevated text-left active:scale-[0.97] transition-all hover:bg-surface hover:shadow-lg focus:outline-none"
+                className="nft-card group text-left w-full focus:outline-none"
               >
                 <div className="aspect-[4/5] bg-surface relative overflow-hidden">
                   <img
@@ -277,7 +267,7 @@ const NFTCollectionGalleryPage: React.FC<NFTCollectionGalleryPageProps> = ({
       </div>
 
       {/* Suggested Other NFTs */}
-      <div className={`mt-8 border-t border-border ${GALLERY_SCROLL_BOTTOM_PADDING}`}>
+      <div className={`mt-8 border-t border-border max-w-[1440px] mx-auto ${GALLERY_SCROLL_BOTTOM_PADDING}`}>
         <NftHorizontalStrip 
           title={t('nft_explore_others')}
           items={enrichNftListings(getAllNftListings().filter(n => n.collectionSlug !== collectionSlug), refPrices, jitter, refPricesUsd).slice(0, 15)}

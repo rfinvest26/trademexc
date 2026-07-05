@@ -1,4 +1,5 @@
 import React from 'react';
+import AppInput from './AppInput';
 
 interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: React.ReactNode;
@@ -12,13 +13,7 @@ interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
   borderless?: boolean;
 }
 
-const sizeClasses: Record<NonNullable<FormFieldProps['size']>, string> = {
-  md: 'h-12 px-4 text-[15px]',
-  sm: 'h-11 px-3.5 text-[14px]',
-};
 
-const baseInputClass =
-  'w-full rounded-2xl text-textPrimary placeholder:text-textMuted outline-none transition-all duration-200';
 
 const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
   (
@@ -56,20 +51,17 @@ const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
               {leftSlot}
             </div>
           ) : null}
-          <input
+          <AppInput
             ref={ref}
             className={[
-              baseInputClass,
-              sizeClasses[size],
-              borderless
-                ? 'border-0 bg-transparent focus:ring-0 focus:border-transparent'
-                : 'border border-white/5 bg-surfaceElevated focus:border-white/10 focus:bg-surfaceElevated/90 focus:ring-0',
-              hasLeftSlot ? 'pl-10' : '',
-              hasRightSlot ? 'pr-10' : '',
-              error ? 'border-down focus:border-down focus:ring-down/20' : '',
+              hasLeftSlot ? '!pl-10' : '',
+              hasRightSlot ? '!pr-10' : '',
               className || '',
               inputClassName,
-            ].join(' ')}
+            ].filter(Boolean).join(' ')}
+            size={size}
+            borderless={borderless}
+            invalid={Boolean(error)}
             {...inputProps}
           />
           {hasRightSlot ? (

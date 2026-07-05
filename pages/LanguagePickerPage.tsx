@@ -51,7 +51,7 @@ const LanguagePickerPage: React.FC<LanguagePickerPageProps> = ({ onBack }) => {
               className={`
                 flex items-center justify-between py-3 px-3 rounded-lg text-left
                 transition-colors active:scale-[0.99]
-                ${isSelected ? 'bg-surfaceElevated text-textPrimary border border-border' : 'bg-surface text-textPrimary hover:bg-surfaceElevated border border-transparent'}
+                ${isSelected ? 'bg-surfaceElevated text-textPrimary app-border' : 'bg-surface text-textPrimary hover:bg-surfaceElevated border border-transparent'}
               `}
             >
               <span className="font-medium text-sm">{t(labelKey)}</span>

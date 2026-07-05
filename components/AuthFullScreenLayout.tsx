@@ -18,7 +18,7 @@ const AuthFullScreenLayout: React.FC<AuthFullScreenLayoutProps> = ({
 }) => {
   return (
     <div
-      className="fixed inset-0 z-[300] bg-background text-white overflow-y-auto overflow-x-hidden"
+      className="fixed left-0 right-0 top-0 bottom-0 z-[300] bg-background text-white overflow-y-auto overflow-x-hidden"
       style={{
         paddingTop: 'env(safe-area-inset-top, 0px)',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
@@ -26,7 +26,7 @@ const AuthFullScreenLayout: React.FC<AuthFullScreenLayoutProps> = ({
     >
       <div className="min-h-full w-full lg:grid lg:grid-cols-2">
         {/* LEFT: Hero (desktop only) — clean, minimal */}
-        <aside className="hidden lg:flex relative overflow-hidden bg-surface border-r border-white/5">
+        <aside className="hidden lg:flex relative overflow-hidden bg-surface border-r border-border">
           <div className="relative flex-1 flex flex-col justify-between p-12">
             <div className="flex items-center gap-3">
               <img src={ETORO_LOGO_URL} alt="" width={32} height={32} className="object-contain" />

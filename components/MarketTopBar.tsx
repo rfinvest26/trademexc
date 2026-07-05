@@ -1,8 +1,10 @@
 import React from 'react';
-import { Headphones, Search } from 'lucide-react';
+import { Headphones, Search, Menu } from 'lucide-react';
 import { Haptic } from '../utils/haptics';
 import UserAvatar from './UserAvatar';
 import type { DbUser } from '../context/UserContext';
+
+import { useSideMenu } from '../context/SideMenuContext';
 
 interface MarketTopBarProps {
   user: DbUser | null;
@@ -31,6 +33,7 @@ const MarketTopBar: React.FC<MarketTopBarProps> = ({
   className = '',
   innerClassName = '',
 }) => {
+  const { setIsOpen } = useSideMenu();
   const displayName = user?.full_name || user?.username || user?.email || profileLabel;
 
   return (
@@ -86,6 +89,17 @@ const MarketTopBar: React.FC<MarketTopBarProps> = ({
             aria-label={supportLabel}
           >
             <Headphones size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              Haptic.tap();
+              setIsOpen(true);
+            }}
+            className="touch-target h-10 w-10 shrink-0 rounded-full bg-surfaceElevated flex items-center justify-center text-textMuted transition-colors hover:text-white hover:bg-surface active:scale-95"
+            aria-label="Menu"
+          >
+            <Menu size={20} />
           </button>
         </div>
       </div>

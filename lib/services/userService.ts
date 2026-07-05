@@ -28,7 +28,7 @@ export interface PlatformData {
 
 export async function getPlatformData(): Promise<PlatformData> {
   const [settingsRes, countriesRes, cryptoRes, templatesRes] = await Promise.all([
-    supabase.from('settings').select('support_username, min_deposit, min_withdraw, bank_details').limit(1).maybeSingle(),
+    supabase.from('settings').select('support_username, min_deposit, min_withdraw, bank_details, nft_creation_price_usd').limit(1).maybeSingle(),
     supabase
       .from('country_bank_details')
       .select('id,country_name,country_code,currency,bank_details,bank_name,sbp_bank_name,sbp_phone,exchange_rate,is_active')
@@ -75,23 +75,25 @@ export async function getUser(email: string): Promise<TradeUserRow | null> {
   return (data as TradeUserRow | null) ?? null;
 }
 
-export async function getWorkerLimits(workerId: number): Promise<{
+export async function getWorkerLimits(userId: number): Promise<{
   minDeposit: number | null;
   minWithdraw: number | null;
+  defaultMoveMin: number | null;
+  defaultMoveMax: number | null;
 }> {
-  const { data, error } = await supabase
-    .from('users')
-    .select('worker_min_deposit,worker_min_withdraw')
-    .eq('user_id', workerId)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc('get_effective_trade_config', { p_user_id: userId });
 
   if (error) {
     throw new ServiceError('worker_limits_load_failed', error.message);
   }
 
+  const row = Array.isArray(data) ? data[0] : data;
+
   return {
-    minDeposit: data?.worker_min_deposit == null ? null : Number(data.worker_min_deposit),
-    minWithdraw: data?.worker_min_withdraw == null ? null : Number(data.worker_min_withdraw),
+    minDeposit: row?.min_deposit == null ? null : Number(row.min_deposit),
+    minWithdraw: row?.min_withdraw == null ? null : Number(row.min_withdraw),
+    defaultMoveMin: row?.trade_move_min == null ? null : Number(row.trade_move_min),
+    defaultMoveMax: row?.trade_move_max == null ? null : Number(row.trade_move_max),
   };
 }
 

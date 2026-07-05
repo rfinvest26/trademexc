@@ -105,7 +105,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onBack, onSuccess, onGoLogi
         />
 
         <div className="pt-6">
-          <button type="submit" disabled={loading} className="btn-cta-full flex items-center justify-center gap-2">
+          <button type="submit" disabled={loading} className="app-button-primary w-full">
             {loading ? <Loader2 className="animate-spin" size={18} /> : null}
             Sign Up
           </button>

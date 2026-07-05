@@ -102,7 +102,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onBack, onSuccess, onGoRegister, 
           </div>
 
           {isEmailConfirmError && (
-            <div className="rounded-xl bg-card border border-border px-4 py-3 mt-4">
+            <div className="rounded-xl bg-card app-border px-4 py-3 mt-4">
               <p className="text-[13px] text-textPrimary">{loginError}</p>
               <button
                 type="button"
@@ -122,7 +122,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onBack, onSuccess, onGoRegister, 
           )}
 
           <div className="pt-4">
-            <button type="submit" disabled={loading} className="btn-cta-full flex items-center justify-center gap-2">
+            <button type="submit" disabled={loading} className="app-button-primary w-full">
               {loading ? <Loader2 className="animate-spin" size={18} /> : null}
               Log In
             </button>
@@ -152,7 +152,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onBack, onSuccess, onGoRegister, 
             setShowForgotSheet(false);
             onGoSupport?.();
           }}
-          className="btn-cta-full"
+          className="app-button-primary w-full"
         >
           Contact Support
         </button>

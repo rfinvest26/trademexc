@@ -1,6 +1,7 @@
 import React from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Menu } from 'lucide-react';
 import { Haptic } from '../utils/haptics';
+import { useSideMenu } from '../context/SideMenuContext';
 import {
   APP_TOP_BAR_CLASS,
   APP_TOP_BAR_ROW,
@@ -26,6 +27,7 @@ const BACK_BUTTON_CLASS =
  * Использовать на всех экранах с возвратом — чтобы пользователь привык к одному месту навигации.
  */
 const PageHeader: React.FC<PageHeaderProps> = ({ title, onBack, right, className = '' }) => {
+  const { setIsOpen } = useSideMenu();
   const handleBack = () => {
     if (onBack) {
       Haptic.tap();

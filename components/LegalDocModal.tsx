@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Haptic } from '../utils/haptics';
+import AppSheet from './AppSheet';
+import AppButton from './AppButton';
 
 export type LegalDocId = 'tos' | 'privacy' | 'aml' | 'cookies';
 
@@ -29,17 +31,13 @@ const LegalDocModal: React.FC<LegalDocModalProps> = ({ doc, onClose }) => {
   if (!doc) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[400] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/72 backdrop-blur-sm animate-fade-in"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="legal-doc-title"
-      onClick={onClose}
+    <AppSheet
+      open={Boolean(doc)}
+      onClose={onClose}
+      labelledBy="legal-doc-title"
+      zIndex={400}
+      panelClassName="max-w-lg max-h-[min(88vh,720px)] flex flex-col"
     >
-      <div
-        className="w-full max-w-lg max-h-[min(88vh,720px)] bg-surfaceElevated rounded-t-3xl sm:rounded-2xl shadow-2xl ring-1 ring-white/5 flex flex-col animate-sheet-up sm:animate-modal-in"
-        onClick={(e) => e.stopPropagation()}
-      >
         <div className="flex items-center justify-between gap-3 px-5 py-4 hairline-bottom shrink-0">
           <h2 id="legal-doc-title" className="text-lg font-semibold text-textPrimary tracking-tight">
             {TITLES[doc]}
@@ -50,7 +48,7 @@ const LegalDocModal: React.FC<LegalDocModalProps> = ({ doc, onClose }) => {
               Haptic.light();
               onClose();
             }}
-            className="touch-target p-2 rounded-xl text-textMuted hover:text-textPrimary hover:bg-surfaceElevated transition-colors"
+            className="app-icon-button"
             aria-label="Закрыть"
           >
             <X size={22} />
@@ -89,19 +87,18 @@ const LegalDocModal: React.FC<LegalDocModalProps> = ({ doc, onClose }) => {
           )}
         </div>
         <div className="shrink-0 px-5 py-4 hairline-top">
-          <button
+          <AppButton
             type="button"
             onClick={() => {
               Haptic.light();
               onClose();
             }}
-            className="w-full py-3.5 rounded-full bg-neon text-black font-semibold text-sm active:scale-[0.99] transition-transform"
+            block
           >
             Понятно
-          </button>
+          </AppButton>
         </div>
-      </div>
-    </div>
+    </AppSheet>
   );
 };
 

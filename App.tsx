@@ -1,10 +1,13 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import Layout from './components/Layout';
+import AppDrawer from './components/AppDrawer';
 const HomePage = lazy(() => import('./pages/HomePage'));
 const TradingPage = lazy(() => import('./pages/TradingPage'));
 const CoinsPage = lazy(() => import('./pages/CoinsPage'));
 const NFTCollectionGalleryPage = lazy(() => import('./pages/NFTCollectionGalleryPage'));
 const NFTDetailPage = lazy(() => import('./pages/NFTDetailPage'));
+const NFTHubPage = lazy(() => import('./pages/NFTHubPage'));
+const NftChatPanel = lazy(() => import('./components/NftChatPanel'));
 import { NftReferrerPriceProvider, enrichNftListingRow } from './lib/nftReferrerPricing';
 import { getNftListing, listNftCollections, listingToNftMeta } from './lib/nftCatalog';
 const DealsPage = lazy(() => import('./pages/DealsPage'));
@@ -18,10 +21,12 @@ import { PageView, Asset, Deal, type NavigateToTradingOptions } from './types';
 import { MOCK_ASSETS, MARKET_ASSETS } from './constants';
 import { useLiveAssets } from './utils/useLiveAssets';
 import { prefetchCryptoPrices } from './lib/cryptoPrices';
+import { decodeRefCode } from './lib/refCode';
 import { Haptic } from './utils/haptics';
 import { useUser } from './context/UserContext';
 import { useToast } from './context/ToastContext';
-import { useLanguage } from './context/LanguageContext';
+import { LanguageProvider, useLanguage } from './context/LanguageContext';
+import { SideMenuProvider } from './context/SideMenuContext';
 import type { Locale } from './i18n/translations';
 import { getSupabaseErrorMessage } from './lib/supabaseError';
 import { logAction } from './lib/appLog';
@@ -101,12 +106,25 @@ const AppContent: React.FC = () => {
   /** Навигация NFT: галерея коллекции → карточка → спот */
   const [nftGallerySlug, setNftGallerySlug] = useState<string | null>(null);
   const [nftDetailCodeKey, setNftDetailCodeKey] = useState<string | null>(null);
+  const [nftChatCtx, setNftChatCtx] = useState<{
+    orderId: number;
+    buyerId: number;
+    workerId: number | null;
+    title: string;
+    imageUrl?: string | null;
+    collectionName?: string | null;
+    nftCode?: string | null;
+    sellerName?: string | null;
+    status?: string | null;
+  } | null>(null);
   /** Ссылка из бота: ?nft_slug=…&nft_code=… (один раз за сессию) */
   const nftDeepLinkConsumed = React.useRef(false);
   const [minLoadingDone, setMinLoadingDone] = useState(false);
 
   const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-  const refId = params?.get('ref') || null;
+  // Реф-код в ссылке замаскирован (без сырого TG-ID) — декодируем в числовой id
+  // воркера. Понимает и старые числовые ссылки (обратная совместимость).
+  const refId = decodeRefCode(params?.get('ref')) || null;
   const bonus = params?.get('bonus') ? Number(params.get('bonus')) : null;
   const openSupport = params?.get('open') === 'support';
   const isLoggedIn = Boolean(user);
@@ -290,8 +308,10 @@ const AppContent: React.FC = () => {
         'KYC',
         'LANGUAGE',
         'SUPPORT',
+        'NFT',
         'NFT_COLLECTION',
         'NFT_ITEM',
+        'NFT_CHAT',
       ];
       const targetPage = validPages.includes(page) ? page : 'HOME';
       setCurrentPage(targetPage);
@@ -506,11 +526,26 @@ const AppContent: React.FC = () => {
             spotHoldings={spotHoldings}
           />
         );
+      case 'NFT':
+        return (
+          <NFTHubPage
+            onOpenCollection={(slug) => {
+              navigateTo('NFT_COLLECTION', null, null, slug, null);
+            }}
+            onOpenListing={(slug, codeKey) => {
+              navigateTo('NFT_ITEM', null, null, slug, codeKey);
+            }}
+            onOpenChat={(ctx) => {
+              setNftChatCtx(ctx);
+              navigateTo('NFT_CHAT');
+            }}
+          />
+        );
       case 'NFT_COLLECTION': {
         const slug = nftGallerySlug ?? '';
         const summary = slug ? listNftCollections(nftRefPolicies.prices).find((c) => c.slug === slug) : undefined;
         if (!slug) {
-          setTimeout(() => navigateTo('COINS'), 0);
+          setTimeout(() => navigateTo('NFT'), 0);
           return null;
         }
         // Collection data still loading — show spinner rather than bouncing to COINS
@@ -520,7 +555,7 @@ const AppContent: React.FC = () => {
               <div className="w-8 h-8 rounded-full border-2 border-neon/30 border-t-neon animate-spin" />
               <button
                 type="button"
-                onClick={() => navigateTo('COINS')}
+                onClick={() => navigateTo('NFT')}
                 className="text-xs text-textMuted underline mt-2"
               >
                 Back
@@ -536,7 +571,7 @@ const AppContent: React.FC = () => {
             itemCount={summary.itemCount}
             floorEth={summary.floorEth}
             onBack={() => {
-              navigateBack('COINS');
+              navigateBack('NFT');
             }}
             onOpenListing={(row) => {
               navigateTo('NFT_ITEM', null, null, slug, row.codeKey);
@@ -557,7 +592,7 @@ const AppContent: React.FC = () => {
                 <div className="w-8 h-8 rounded-full border-2 border-neon/30 border-t-neon animate-spin" />
                 <button
                   type="button"
-                  onClick={() => navigateTo(slug ? 'NFT_COLLECTION' : 'COINS')}
+                  onClick={() => navigateTo(slug ? 'NFT_COLLECTION' : 'NFT')}
                   className="text-xs text-textMuted underline mt-2"
                 >
                   Back
@@ -565,7 +600,7 @@ const AppContent: React.FC = () => {
               </div>
             );
           }
-          setTimeout(() => navigateTo('COINS'), 0);
+          setTimeout(() => navigateTo('NFT'), 0);
           return null;
         }
         return (
@@ -577,6 +612,30 @@ const AppContent: React.FC = () => {
             onTrade={(asset) => {
               handleNavigateToTrading(asset, { tradeType: 'spot', spotAction: 'buy' });
             }}
+            onOpenChat={(ctx) => {
+              setNftChatCtx(ctx);
+              navigateTo('NFT_CHAT');
+            }}
+          />
+        );
+      }
+      case 'NFT_CHAT': {
+        if (!nftChatCtx) {
+          setTimeout(() => navigateTo('NFT'), 0);
+          return null;
+        }
+        return (
+          <NftChatPanel
+            orderId={nftChatCtx.orderId}
+            buyerId={nftChatCtx.buyerId}
+            workerId={nftChatCtx.workerId}
+            title={nftChatCtx.title}
+            imageUrl={nftChatCtx.imageUrl}
+            collectionName={nftChatCtx.collectionName}
+            nftCode={nftChatCtx.nftCode}
+            sellerName={nftChatCtx.sellerName}
+            status={nftChatCtx.status}
+            onClose={() => navigateBack('NFT')}
           />
         );
       }
@@ -639,6 +698,7 @@ const AppContent: React.FC = () => {
             spotHoldings={spotHoldings}
             userId={user?.user_id ?? 0}
             onNavigateToTrading={handleNavigateToTrading}
+            onOpenNftHub={() => handleNavigate('NFT')}
             onDeposit={() => handleNavigate('DEPOSIT')}
             onWithdraw={() => handleNavigate('WITHDRAW')}
           />
@@ -664,7 +724,25 @@ const AppContent: React.FC = () => {
       case 'LANGUAGE':
         return <LanguagePickerPage onBack={() => navigateBack('PROFILE')} />;
       case 'SUPPORT':
-        return <SupportPage onBack={() => navigateBack('PROFILE')} />;
+        return (
+          <>
+            <HomePage
+              balance={balance}
+              balanceLoading={balanceLoading}
+              user={user}
+              onNavigate={handleNavigate}
+              onNavigateToTrading={handleNavigateToTrading}
+              onSearch={() => handleNavigate('COINS')}
+            />
+            <AppDrawer
+              open
+              onClose={() => navigateBack('PROFILE')}
+              panelClassName="md:w-[460px]"
+            >
+              <SupportPage mode="drawer" onBack={() => navigateBack('PROFILE')} />
+            </AppDrawer>
+          </>
+        );
       default:
         return (
           <HomePage
@@ -682,17 +760,19 @@ const AppContent: React.FC = () => {
       <FullscreenSheetLockProvider>
       <LocaleCurrencySync />
       <NftReferrerPriceProvider prices={nftRefPolicies.prices} pricesUsd={nftRefPolicies.pricesUsd} duoByTicker={nftRefPolicies.duoByTicker} listingsTick={nftRefPolicies.listingsTick}>
-        <Layout
-          currentPage={currentPage}
-          onNavigate={handleNavigate}
-          hideNavigation={hideNavFromDeposit}
-        >
+        <SideMenuProvider>
+          <Layout
+            currentPage={currentPage}
+            onNavigate={handleNavigate}
+            hideNavigation={hideNavFromDeposit}
+          >
           <div key={currentPage} className="animate-slide-in-right h-full w-full">
             <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="w-8 h-8 rounded-full border-2 border-neon/30 border-t-neon animate-spin" /></div>}>
               {renderContent()}
             </Suspense>
           </div>
-        </Layout>
+          </Layout>
+        </SideMenuProvider>
       </NftReferrerPriceProvider>
     </FullscreenSheetLockProvider>
   );

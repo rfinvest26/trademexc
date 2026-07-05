@@ -29,7 +29,7 @@ const proofCards = [
 const PromoLandingContent: React.FC<PromoLandingContentProps> = ({ onAction }) => {
   return (
     <section className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-      <div className="rounded-[18px] bg-white/[0.035] p-5 ring-1 ring-white/[0.07] lg:p-6">
+      <div className="rounded-[18px] bg-white/[0.035] p-5 ring-1 ring-border lg:p-6">
         <div className="mb-8 flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-neon">MEXC advantage</p>
@@ -57,7 +57,7 @@ const PromoLandingContent: React.FC<PromoLandingContentProps> = ({ onAction }) =
               key={title}
               type="button"
               onClick={onAction}
-              className="group flex items-center gap-4 rounded-2xl bg-background/56 px-4 py-3 text-left ring-1 ring-white/[0.05] transition-colors hover:bg-background/78"
+              className="group flex items-center gap-4 rounded-xl bg-background/56 px-4 py-3 text-left ring-1 ring-border transition-colors hover:bg-background/78"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neon/[0.10] text-neon ring-1 ring-neon/15">
                 <Icon size={19} strokeWidth={2.1} />
@@ -72,7 +72,7 @@ const PromoLandingContent: React.FC<PromoLandingContentProps> = ({ onAction }) =
         </div>
       </div>
 
-      <div className="relative overflow-hidden rounded-[18px] bg-[#07111e] p-5 ring-1 ring-white/[0.07] lg:p-6">
+      <div className="relative overflow-hidden rounded-[18px] bg-[#07111e] p-5 ring-1 ring-border lg:p-6">
         <div className="pointer-events-none absolute inset-0 opacity-90" aria-hidden>
           <svg className="h-full w-full" viewBox="0 0 720 420" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
@@ -109,7 +109,7 @@ const PromoLandingContent: React.FC<PromoLandingContentProps> = ({ onAction }) =
                 key={pair}
                 type="button"
                 onClick={onAction}
-                className="rounded-2xl bg-background/68 p-3 text-left ring-1 ring-white/[0.06] transition-colors hover:bg-background/88"
+                className="rounded-xl bg-background/68 p-3 text-left ring-1 ring-border transition-colors hover:bg-background/88"
               >
                 <span className="font-mono text-[12px] font-bold text-textMuted">{pair}/USDT</span>
                 <span className="mt-2 block font-mono text-[19px] font-black text-white">{price}</span>

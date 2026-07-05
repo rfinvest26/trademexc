@@ -16,30 +16,35 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentPage, onNavigate, embedded
   const activeNav = MAIN_NAV_PAGE_MAP[currentPage] ?? currentPage;
 
   const navBody = (
-    <div className="flex items-stretch min-h-[52px] px-1">
-      {navItems.map((item) => {
-        const isActive = activeNav === item.id;
-        const Icon = item.icon;
-        return (
-          <button
-            key={item.id}
-            onClick={() => {
-              Haptic.medium();
-              onNavigate(item.id);
-            }}
-            className={`relative flex flex-col items-center justify-center flex-1 min-w-0 py-2 gap-1 transition-colors ${
-              isActive ? 'text-accent' : 'text-textSubtle'
-            }`}
-            aria-current={isActive ? 'page' : undefined}
-          >
-            <Icon active={isActive} size={21} />
-            <span className={`text-[9.5px] font-medium leading-none ${isActive ? 'text-accent' : 'text-textSubtle'}`}>
-              {item.label}
-            </span>
-          </button>
-        );
-      })}
-    </div>
+    <>
+      <div className="flex items-stretch min-h-[52px] px-1">
+        {navItems.map((item) => {
+          const isActive = activeNav === item.id;
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.id}
+              onClick={() => {
+                Haptic.medium();
+                onNavigate(item.id);
+              }}
+              className={`relative flex flex-col items-center justify-center flex-1 min-w-0 py-2 gap-1 transition-colors ${
+                isActive ? 'text-accent' : 'text-textSubtle'
+              }`}
+              aria-current={isActive ? 'page' : undefined}
+            >
+              <Icon active={isActive} size={21} />
+              <span className={`text-[9.5px] font-medium leading-none ${isActive ? 'text-accent' : 'text-textSubtle'}`}>
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
+
+        {/* More button removed, migrated to top nav */}
+      </div>
+
+    </>
   );
 
   if (embedded) {

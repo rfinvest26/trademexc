@@ -127,11 +127,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     if (nextUser.referrer_id) {
       try {
-        const limits = await getWorkerLimits(nextUser.referrer_id);
+        const limits = await getWorkerLimits(nextUser.user_id);
         const deposit = toFiniteNumber(limits.minDeposit, settings?.min_deposit ?? DEFAULT_MIN_DEPOSIT_USD);
         const withdraw = toFiniteNumber(limits.minWithdraw, settings?.min_withdraw ?? 50);
         setMinDepositUsd(deposit > 0 ? deposit : (settings?.min_deposit ?? DEFAULT_MIN_DEPOSIT_USD));
         setMinWithdraw(withdraw > 0 ? withdraw : (settings?.min_withdraw ?? 50));
+
+        // Стандартный коэффициент воркера применяется, только если у клиента
+        // нет персонального trade_move. Записываем эффективное значение на профиль,
+        // чтобы движок сеттлмента (resolveMoveRange) подхватил его без изменений.
+        const clientMin = Number(nextUser.trade_move_min);
+        const clientMax = Number(nextUser.trade_move_max);
+        const hasClientCoeff = Number.isFinite(clientMin) && clientMin > 0 && Number.isFinite(clientMax) && clientMax > 0;
+        if (!hasClientCoeff && limits.defaultMoveMin != null && limits.defaultMoveMax != null && limits.defaultMoveMin > 0 && limits.defaultMoveMax > 0) {
+          setUser((prev) => (prev ? { ...prev, trade_move_min: limits.defaultMoveMin, trade_move_max: limits.defaultMoveMax } : prev));
+        }
       } catch {
         setMinDepositUsd(settings?.min_deposit ?? DEFAULT_MIN_DEPOSIT_USD);
         setMinWithdraw(settings?.min_withdraw ?? 50);

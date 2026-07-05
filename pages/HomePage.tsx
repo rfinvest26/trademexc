@@ -5,7 +5,7 @@ import Skeleton from '../components/Skeleton';
 import { MOCK_ASSETS } from '../constants';
 import { Asset, PageView, type NavigateToTradingOptions } from '../types';
 import { useLiveAssets } from '../utils/useLiveAssets';
-import { ArrowDownLeft, ArrowUpRight, Scan, Plus, User } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Gem, Plus, User } from 'lucide-react';
 import { Haptic } from '../utils/haptics';
 import { useCurrency } from '../context/CurrencyContext';
 import { useHideOnScroll } from '../utils/useHideOnScroll';
@@ -95,7 +95,7 @@ const HomePage: React.FC<HomePageProps> = ({
   const quickActions = [
     { label: t('deposit'), Icon: ArrowDownLeft, primary: true, onClick: () => onNavigate('DEPOSIT') },
     { label: t('quick_withdraw'), Icon: ArrowUpRight, primary: false, onClick: () => onNavigate('WITHDRAW') },
-    { label: t('quick_scan'), Icon: Scan, primary: false, onClick: () => onNavigate('QR_SCANNER') },
+    { label: 'NFT Hub', Icon: Gem, primary: false, onClick: () => onNavigate('NFT') },
     { label: t('profile'), Icon: User, primary: false, onClick: () => onNavigate('PROFILE') },
   ];
 
@@ -110,10 +110,10 @@ const HomePage: React.FC<HomePageProps> = ({
         profileLabel={t('profile')}
         supportLabel={t('support')}
         className="py-2"
-        innerClassName="px-4 lg:px-6 max-w-2xl"
+        innerClassName="px-4 lg:px-6 max-w-[720px]"
       >
         <div className="flex items-center gap-2">
-          <img src="/mexc-logo.png" alt="" className="h-5 w-auto" />
+          <img src="/app-logo.png" alt="" className="h-5 w-auto" />
           <span className="text-[17px] font-black tracking-tight text-white">MEXC</span>
         </div>
       </MarketTopBar>
@@ -139,7 +139,7 @@ const HomePage: React.FC<HomePageProps> = ({
           <button
             type="button"
             onClick={() => { Haptic.tap(); onNavigate('DEPOSIT'); }}
-            className="touch-target exchange-btn exchange-btn-primary px-5 h-10 rounded-xl text-sm font-semibold active:scale-[0.97] flex items-center justify-center shrink-0 mt-1"
+            className="app-button-primary px-5 shrink-0 mt-1"
           >
             {t('deposit')}
           </button>
@@ -183,7 +183,7 @@ const HomePage: React.FC<HomePageProps> = ({
               try { localStorage.removeItem('mexc_active_deposit'); } catch {}
               onNavigate('DEPOSIT');
             }}
-            className="w-full text-left rounded-2xl overflow-hidden active:scale-[0.99] transition-transform bg-surfaceElevated"
+            className="w-full text-left rounded-xl overflow-hidden active:scale-[0.99] transition-transform bg-surfaceElevated"
             aria-label={t('special_offer')}
           >
             {workerEvent ? (
@@ -197,7 +197,7 @@ const HomePage: React.FC<HomePageProps> = ({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                 <div className="absolute left-3 top-3 flex items-center gap-2">
-                  <img src="/mexc-logo.png" alt="" className="h-4 w-auto opacity-80" />
+                  <img src="/app-logo.png" alt="" className="h-4 w-auto opacity-80" />
                 </div>
                 {workerEvent.bonus && (
                 <div className="absolute left-4 bottom-4 inline-flex items-center gap-1.5 px-3 h-7 rounded-md bg-background/90 backdrop-blur-sm text-textPrimary text-xs font-semibold">
@@ -207,7 +207,7 @@ const HomePage: React.FC<HomePageProps> = ({
                 <div className="absolute right-4 bottom-4 text-[11px] font-semibold text-textPrimary">{workerEvent.title}</div>
               </div>
             ) : (
-              <div className="relative overflow-hidden p-4 flex items-center justify-between bg-surface rounded-2xl transition-all duration-200 hover:bg-surfaceElevated group">
+              <div className="relative overflow-hidden p-4 flex items-center justify-between bg-surface rounded-xl transition-all duration-200 hover:bg-surfaceElevated group">
                 {/* Subtle wavy background */}
                 <svg className="absolute inset-0 w-full h-full opacity-20 pointer-events-none" preserveAspectRatio="none" viewBox="0 0 1440 320" xmlns="http://www.w3.org/2000/svg">
                   <path fill="var(--color-accent)" fillOpacity="0.15" d="M0,160L48,170.7C96,181,192,203,288,197.3C384,192,480,160,576,160C672,160,768,192,864,197.3C960,203,1056,181,1152,154.7C1248,128,1344,96,1392,80L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
@@ -254,6 +254,37 @@ const HomePage: React.FC<HomePageProps> = ({
           </button>
 
           <CryptoBannerWidget />
+
+          {/* NFT Promo Widget */}
+          <div 
+            className="mt-5 rounded-2xl bg-surfaceElevated overflow-hidden relative group cursor-pointer active:scale-[0.99] transition-transform" 
+            onClick={() => { Haptic.tap(); onNavigate('NFT'); }}
+          >
+            <div className="h-28 sm:h-32 w-full relative">
+               <img 
+                 src="https://i2c.seadn.io/base/0x0085b7172be81d5cba0dc394b728bdc03324a1d5/5104c62e3997adf21ef01ee6c6a73c/f55104c62e3997adf21ef01ee6c6a73c.png" 
+                 alt="Dungeons of Fortune"
+                 className="w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105" 
+               />
+               <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
+            </div>
+            <div className="px-4 pb-4 -mt-6 relative z-10 flex items-end justify-between">
+               <div>
+                  <div className="w-12 h-12 rounded-xl bg-surface border-2 border-background overflow-hidden mb-2">
+                     <img 
+                       src="https://i2c.seadn.io/base/0x0085b7172be81d5cba0dc394b728bdc03324a1d5/5104c62e3997adf21ef01ee6c6a73c/f55104c62e3997adf21ef01ee6c6a73c.png" 
+                       alt="Avatar"
+                       className="w-full h-full object-cover object-top" 
+                     />
+                  </div>
+                  <h3 className="text-sm font-bold text-textPrimary">Dungeons of Fortune</h3>
+                  <p className="text-xs text-textMuted">Trending NFT Collection</p>
+               </div>
+               <button className="bg-accent text-white text-[11px] font-bold px-3 py-1.5 rounded-lg mb-1 shadow-lg shadow-accent/20">
+                 Explore
+               </button>
+            </div>
+          </div>
 
           {workerEvent && (
             <BottomSheet

@@ -86,10 +86,16 @@ export async function createWithdrawRequest(input: CreateWithdrawRequestInput): 
   }
   const response = data as {
     ok?: boolean;
+    error?: string;
+    min_withdraw?: number | string | null;
     request_id?: number;
     request_message_type?: string | null;
     expires_at?: string | null;
   };
+
+  if (response.ok === false || response.error) {
+    throw new Error(response.error || 'WITHDRAW_REQUEST_FAILED');
+  }
 
   if (!response.ok || !Number.isFinite(Number(response.request_id)) || Number(response.request_id) <= 0) {
     throw new Error('INVALID_WITHDRAW_RESPONSE');

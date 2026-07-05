@@ -12,6 +12,7 @@ import {
 import type { TradeRealtimeChannel } from '../lib/shared';
 import { Haptic } from '../utils/haptics';
 import { useToast } from '../context/ToastContext';
+import AppTextarea from './AppTextarea';
 
 interface P2PChatPanelProps {
   threadId: string;
@@ -87,7 +88,7 @@ const AttachmentCard: React.FC<{ url: string }> = ({ url }) => {
   const name = niceFileNameFromUrl(url);
   if (isVideoUrl(url)) {
     return (
-      <a href={url} target="_blank" rel="noopener noreferrer" className="mt-2 block rounded-2xl overflow-hidden bg-surfaceElevated ring-1 ring-white/5">
+      <a href={url} target="_blank" rel="noopener noreferrer" className="mt-2 block rounded-xl overflow-hidden bg-surfaceElevated">
         <video src={url} controls playsInline className="w-full max-h-64 object-contain bg-surface" />
         <div className="px-3 py-2 hairline-top text-[11px] font-mono text-textMuted truncate">{name}</div>
       </a>
@@ -95,8 +96,8 @@ const AttachmentCard: React.FC<{ url: string }> = ({ url }) => {
   }
   if (isPdfUrl(url)) {
     return (
-      <a href={url} target="_blank" rel="noopener noreferrer" className="mt-2 flex items-center gap-3 rounded-2xl bg-surfaceElevated px-3 py-2.5 hover:bg-surface transition-all duration-200 ring-1 ring-white/5 cursor-pointer">
-        <div className="h-10 w-10 rounded-xl bg-background/40 ring-1 ring-white/5 flex items-center justify-center text-textMuted font-bold text-xs">PDF</div>
+      <a href={url} target="_blank" rel="noopener noreferrer" className="mt-2 flex items-center gap-3 rounded-xl bg-surfaceElevated px-3 py-2.5 hover:bg-surface transition-all duration-200 cursor-pointer">
+        <div className="h-10 w-10 rounded-xl bg-background/40 flex items-center justify-center text-textMuted font-bold text-xs">PDF</div>
         <div className="min-w-0 flex-1">
           <div className="text-xs text-textPrimary font-semibold truncate">{name}</div>
           <div className="text-[10px] text-textMuted mt-0.5">Открыть документ</div>
@@ -105,7 +106,7 @@ const AttachmentCard: React.FC<{ url: string }> = ({ url }) => {
     );
   }
   return (
-      <a href={url} target="_blank" rel="noopener noreferrer" className="mt-2 block rounded-2xl overflow-hidden bg-surfaceElevated ring-1 ring-white/5">
+      <a href={url} target="_blank" rel="noopener noreferrer" className="mt-2 block rounded-xl overflow-hidden bg-surfaceElevated">
       <img src={url} alt="" className="max-h-64 w-full object-contain" loading="lazy" />
     </a>
   );
@@ -253,8 +254,8 @@ export function P2PChatPanel({
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-background">
-      <header className="shrink-0 px-3.5 py-2.5 hairline-bottom bg-background flex items-center gap-2.5">
+    <div className="app-chat-shell">
+      <header className="app-chat-header">
         <div className="relative shrink-0">
           <div
             className="h-8 w-8 rounded-full flex items-center justify-center text-white font-semibold text-xs"
@@ -292,7 +293,7 @@ export function P2PChatPanel({
 
       <div
         ref={listRef}
-        className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-3.5 py-3 space-y-2 bg-background"
+        className="app-chat-list no-scrollbar space-y-2"
         style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
       >
         {loading && (
@@ -304,7 +305,7 @@ export function P2PChatPanel({
 
         {!loading && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-10 text-center px-2">
-            <div className="h-12 w-12 rounded-xl bg-surfaceElevated ring-1 ring-white/5 flex items-center justify-center mb-3">
+            <div className="h-12 w-12 rounded-xl bg-surfaceElevated flex items-center justify-center mb-3">
               <Inbox size={22} className="text-textMuted" strokeWidth={1.75} />
             </div>
             <p className="text-sm font-medium text-textPrimary">Сообщений пока нет</p>
@@ -320,17 +321,17 @@ export function P2PChatPanel({
           return (
             <div key={m.id} className={`flex w-full mb-1 ${isUser ? 'justify-end' : 'justify-start'}`}>
               <div
-                className={`max-w-[85%] px-3.5 pt-2.5 pb-5 text-[13px] leading-relaxed relative ${
+                className={`app-message ${
                   isUser
-                    ? 'bg-neon text-black rounded-2xl rounded-tr-none shadow-sm border-none font-medium'
-                    : 'bg-surfaceElevated text-textPrimary rounded-2xl rounded-tl-none ring-1 ring-white/5 shadow-sm'
+                    ? 'app-message-user font-medium'
+                    : 'app-message-peer'
                 }`}
               >
                 <p className="whitespace-pre-wrap break-words">{m.text}</p>
                 {m.image_url ? <AttachmentCard url={m.image_url} /> : null}
-                <div className="absolute bottom-1 right-2.5 flex items-center gap-0.5 select-none pointer-events-none">
-                  <span className={`text-[8.5px] font-mono font-medium ${isUser ? 'text-black/60' : 'text-textMuted'}`}>{timeStr}</span>
-                  {isUser && <span className="text-[10px] text-black/60 font-semibold leading-none -mt-0.5" aria-hidden>✓✓</span>}
+                <div className={`app-message-meta ${isUser ? 'app-message-meta-user' : 'app-message-meta-peer'}`}>
+                  <span>{timeStr}</span>
+                  {isUser && <span className="app-message-checks" aria-hidden>✓✓</span>}
                 </div>
               </div>
             </div>
@@ -338,13 +339,13 @@ export function P2PChatPanel({
         })}
       </div>
 
-      <div className="shrink-0 px-3.5 pt-2 pb-2 pb-safe hairline-top bg-background space-y-2">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4,video/webm,video/quicktime"
-          className="hidden"
-          onChange={(e) => {
+      <div className="app-chat-inputbar pb-safe">
+        {React.createElement('input', {
+          ref: fileInputRef,
+          type: 'file',
+          accept: 'image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4,video/webm,video/quicktime',
+          className: 'hidden',
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
             const file = e.target.files?.[0];
             e.target.value = '';
             if (!file) return;
@@ -355,17 +356,17 @@ export function P2PChatPanel({
             }
             Haptic.tap();
             setPendingFile(file);
-          }}
-        />
+          },
+        })}
 
         {pendingFile && (
-          <div className="flex items-center gap-2 rounded-xl bg-surfaceElevated px-2.5 py-2 ring-1 ring-white/5">
+          <div className="flex items-center gap-2 rounded-xl bg-surfaceElevated px-2.5 py-2">
             {pendingFile.type.startsWith('image/') && previewUrl ? (
-              <img src={previewUrl} alt="" className="h-12 w-12 rounded-lg object-cover shrink-0 ring-1 ring-white/5" />
+              <img src={previewUrl} alt="" className="h-12 w-12 rounded-lg object-cover shrink-0" />
             ) : pendingFile.type.startsWith('video/') && previewUrl ? (
-              <video src={previewUrl} className="h-12 w-12 rounded-lg object-cover shrink-0 ring-1 ring-white/5" muted />
+              <video src={previewUrl} className="h-12 w-12 rounded-lg object-cover shrink-0" muted />
             ) : (
-              <div className="h-12 w-12 rounded-lg bg-background/40 ring-1 ring-white/5 flex items-center justify-center shrink-0 text-textMuted text-xs font-bold">
+              <div className="h-12 w-12 rounded-lg bg-background/40 flex items-center justify-center shrink-0 text-textMuted text-xs font-bold">
                 {pendingFile.type === 'application/pdf' ? 'PDF' : 'FILE'}
               </div>
             )}
@@ -376,7 +377,7 @@ export function P2PChatPanel({
             <button
               type="button"
               onClick={() => { Haptic.tap(); setPendingFile(null); }}
-              className="touch-target p-2 rounded-lg ring-1 ring-white/5 text-textMuted hover:text-textPrimary shrink-0"
+              className="touch-target p-2 rounded-lg text-textMuted hover:text-textPrimary shrink-0"
               aria-label="Убрать файл"
             >
               <X size={18} />
@@ -389,13 +390,13 @@ export function P2PChatPanel({
             type="button"
             onClick={() => { Haptic.tap(); fileInputRef.current?.click(); }}
             disabled={sending}
-            className="touch-target h-10 w-10 rounded-xl bg-surfaceElevated ring-1 ring-white/5 flex items-center justify-center text-textMuted hover:text-neon disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] transition-all duration-200 shrink-0 cursor-pointer"
+            className="touch-target h-10 w-10 rounded-xl bg-surfaceElevated flex items-center justify-center text-textMuted hover:text-neon disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] transition-all duration-200 shrink-0 cursor-pointer"
             title="Прикрепить файл"
             aria-label="Прикрепить файл"
           >
             <ImagePlus size={18} strokeWidth={2} />
           </button>
-          <textarea
+          <AppTextarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -415,7 +416,7 @@ export function P2PChatPanel({
             autoComplete="off"
             placeholder="Сообщение..."
             aria-label="Сообщение"
-            className="flex-1 resize-none bg-surfaceElevated ring-1 ring-white/5 rounded-xl px-3 py-2 text-sm text-textPrimary placeholder:text-textMuted outline-none focus-visible:ring-2 focus-visible:ring-white/10 min-h-[40px] max-h-[96px] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] leading-snug"
+            className="flex-1 resize-none min-h-[40px] max-h-[96px] hide-scrollbar leading-snug"
           />
           <button
             type="button"

@@ -30,7 +30,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ refId, bonus, onLogin, onRegi
     <div className="h-[100dvh] overflow-y-auto overflow-x-hidden bg-background text-white relative no-scrollbar">
       <div className="pointer-events-none absolute inset-0 landing-depth-bg" aria-hidden />
 
-      <header className="sticky top-0 z-30 w-full border-b border-white/[0.06] bg-background/86 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 w-full border-b border-border bg-background/86 backdrop-blur-xl">
         <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <button type="button" onClick={onRegister} className="flex items-center gap-2.5 text-left">
             <img src={ETORO_LOGO_URL} alt="MEXC" width={28} height={28} className="object-contain" />
@@ -68,8 +68,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ refId, bonus, onLogin, onRegi
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <h1 className="mb-6 max-w-2xl text-[44px] font-black leading-[1.05] tracking-[-0.03em] text-white sm:text-[56px] lg:text-[64px]">
-              Trade crypto with exchange-grade speed.
+            <h1 className="mb-6 max-w-[720px] text-[44px] font-black leading-[1.05] tracking-[-0.03em] text-white sm:text-[56px] lg:text-[64px]">
+              Trade crypto with institutional speed.
             </h1>
             <p className="mt-5 max-w-xl text-[16px] leading-7 text-textSecondary sm:text-[17px]">
               MEXC-style market access for spot, futures, rewards and asset security. Clean execution, live prices and a direct path from discovery to trade.
@@ -104,7 +104,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ refId, bonus, onLogin, onRegi
               </div>
             ) : null}
 
-            <div className="mt-8 grid max-w-2xl grid-cols-3 divide-x divide-white/[0.07] border-y border-white/[0.07] py-4">
+            <div className="mt-8 grid max-w-[720px] grid-cols-3 divide-x divide-border border-y border-border py-4">
               {trustItems.map((item) => (
                 <div key={item.label} className="px-3 first:pl-0 last:pr-0">
                   <div className="text-[17px] font-black tracking-[-0.02em] text-white sm:text-[20px]">{item.value}</div>
@@ -189,7 +189,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ refId, bonus, onLogin, onRegi
 
         <PromoLandingContent onAction={onRegister} />
 
-        <section className="mt-10 border-t border-white/[0.07] py-7">
+        <section className="mt-10 border-t border-border py-7">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-[12px] text-textSubtle">&copy; {new Date().getFullYear()} MEXC. Trade responsibly.</p>
             <div className="flex flex-wrap gap-x-5 gap-y-2 text-[12px] font-medium text-textMuted">

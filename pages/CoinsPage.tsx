@@ -55,7 +55,7 @@ function MarketsPickAvatar({ asset }: { asset: Asset }) {
     <img
       src={src}
       alt=""
-      className="h-7 w-7 shrink-0 rounded-md object-cover ring-1 ring-white/[0.08] bg-black/50"
+      className="h-7 w-7 shrink-0 rounded-md object-cover ring-1 ring-border bg-black/50"
       loading="lazy"
       referrerPolicy="no-referrer"
       onError={() => {
@@ -79,7 +79,7 @@ interface CoinsPageProps {
   onNavigateToTrading: (asset: Asset, options?: NavigateToTradingOptions) => void;
   onOpenNftCollection?: (collectionSlug: string) => void;
   onOpenNftListing?: (row: NftListingRow) => void;
-  onNavigate?: (page: 'PROFILE' | 'SUPPORT') => void;
+  onNavigate?: (page: 'PROFILE' | 'SUPPORT' | 'NFT') => void;
 }
 
 const CoinsPage: React.FC<CoinsPageProps> = ({
@@ -336,7 +336,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
 
   return (
     <div className="flex flex-col h-full animate-fade-in relative">
-      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-md pb-2 pt-1 border-b border-white/5">
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-md pb-2 pt-1 border-b border-border">
         <MarketTopBar
           user={user}
           sticky={false}
@@ -345,7 +345,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
           profileLabel={t('profile')}
           supportLabel={t('support')}
           className="py-1"
-          innerClassName="px-4 lg:px-6 max-w-2xl"
+          innerClassName="px-4 lg:px-6 max-w-[1440px] mx-auto"
         >
           <div className="flex-1 w-full flex justify-center">
             <TopSearchControl
@@ -359,9 +359,9 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
           </div>
         </MarketTopBar>
 
-        {/* Primary tabs with pills */}
-        <div className="px-4 lg:px-6 pt-3 pb-2 max-w-2xl w-full mx-auto">
-          <div className="flex items-center gap-1 p-1 rounded-[16px] bg-surfaceElevated overflow-x-auto no-scrollbar">
+        {/* Primary tabs */}
+        <div className="px-0 pt-1 max-w-[1440px] w-full mx-auto">
+          <div className="app-tabs px-4 lg:px-6 overflow-x-auto no-scrollbar">
             {(
               [
                 ['favorites', t('markets_tab_favorites')],
@@ -376,13 +376,10 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
                   type="button"
                   onClick={() => {
                     Haptic.tap();
+                    if (id === 'nft') { onNavigate?.('NFT'); return; }
                     setPrimaryTab(id);
                   }}
-                  className={`flex-1 text-center whitespace-nowrap px-3 py-2 rounded-[12px] text-[13px] font-semibold transition-all active:scale-[0.98] ${
-                    active
-                      ? 'bg-surface text-textPrimary shadow-sm'
-                      : 'text-textSubtle hover:text-textSecondary hover:bg-surface/50'
-                  }`}
+                  className={`app-tab ${active ? 'app-tab-active' : ''}`}
                 >
                   {label}
                 </button>
@@ -392,7 +389,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
         </div>
 
         {/* Sort chips - compact horizontal scroll */}
-        <div className="px-4 lg:px-6 max-w-2xl w-full mx-auto pb-2">
+        <div className="px-4 lg:px-6 max-w-[1440px] w-full mx-auto pb-2">
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
             {(primaryTab === 'crypto' || primaryTab === 'favorites'
               ? cryptoSortChips
@@ -413,11 +410,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
                       setNftSort(chip.key as NftMarketsSort);
                     }
                   }}
-                  className={`whitespace-nowrap shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all active:scale-[0.98] ${
-                    active
-                      ? 'bg-surfaceElevated text-textPrimary'
-                      : 'text-textSubtle hover:text-textSecondary hover:bg-surface'
-                  }`}
+                  className={`app-chip shrink-0 ${active ? 'app-chip-active' : ''}`}
                 >
                   {chip.label}
                 </button>
@@ -427,7 +420,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
         </div>
 
         {/* Table header - more compact */}
-        <div className="px-4 lg:px-6 max-w-2xl w-full mx-auto pb-2 pt-1">
+        <div className="px-4 lg:px-6 max-w-[1440px] w-full mx-auto pb-2 pt-1">
           <div className="grid grid-cols-12 gap-2 text-[11px] text-textMuted font-medium">
             {primaryTab === 'nft' ? (
               <>
@@ -446,7 +439,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
         </div>
       </div>
 
-      <div className="px-4 pb-56 pt-2 min-h-screen max-w-2xl w-full mx-auto">
+      <div className="px-4 pb-56 pt-2 min-h-screen max-w-[1440px] w-full mx-auto">
         {primaryTab === 'nft' ? (
           nftHasResults ? (
             <div className="flex flex-col">
@@ -495,7 +488,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
                         Haptic.tap();
                         onOpenNftListing?.(hit);
                       }}
-                      className="rounded-xl overflow-hidden bg-surfaceElevated text-left active:scale-[0.98] transition-transform"
+                      className="nft-card text-left w-full"
                     >
                       <div className="aspect-square bg-surface">
                         <img src={hit.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
@@ -514,7 +507,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
               ) : (
                 <>
                   {searchQuery.trim() && nftMarketHits.length > 0 ? (
-                    <div className="mb-3 rounded-xl overflow-hidden bg-surfaceElevated divide-y divide-surface">
+                    <div className="mb-3 rounded-xl app-border overflow-hidden divide-y divide-border">
                       {nftMarketHits.map((hit) => (
                         <button
                           key={`hit-${hit.collectionSlug}-${hit.codeKey}`}
@@ -602,8 +595,8 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
         ) : (
           <div className="flex flex-col">
             {primaryTab === 'favorites' && !searchQuery.trim() ? (
-              <div className="mb-3 rounded-xl overflow-hidden bg-surfaceElevated">
-                <div className="px-3 pt-2 pb-2 hairline-bottom">
+              <div className="mb-3 rounded-xl app-border bg-surface overflow-hidden">
+                <div className="px-3 pt-2 pb-2 border-b border-border">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-[13px] font-bold text-textPrimary leading-tight truncate">
                       {t('markets_favorites_picks_title')}
@@ -628,7 +621,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
                           key={asset.id}
                           type="button"
                           onClick={() => openPickAsset(asset)}
-                          className="flex items-center gap-1.5 text-left rounded-lg px-2 py-1.5 bg-surface border border-border hover:bg-surfaceElevated active:scale-[0.99] transition-colors"
+                          className="flex items-center gap-1.5 text-left rounded-lg px-2 py-1.5 bg-surface app-border hover:bg-surfaceElevated active:scale-[0.99] transition-colors"
                         >
                           <MarketsPickAvatar asset={asset} />
                           <div className="min-w-0 flex-1">
@@ -700,10 +693,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
               const badgeClass = isUp ? 'bg-up text-black' : 'bg-down text-black';
               const fav = favorites.has(asset.ticker);
               return (
-                <div
-                  key={asset.id}
-                  className="py-1"
-                >
+                <div key={asset.id} className="app-row border-b border-border last:border-b-0">
                   <div
                     role="button"
                     tabIndex={0}
@@ -728,7 +718,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
                         onNavigateToTrading(asset, forced);
                       }
                     }}
-                    className="w-full grid grid-cols-12 gap-2 items-center text-left active:scale-[0.98] transition-all hover:bg-surface/40 px-2 -mx-2 py-2 rounded-[14px] outline-none"
+                    className="w-full grid grid-cols-12 gap-2 items-center text-left active:scale-[0.98] transition-colors hover:bg-surface/40 py-2.5 outline-none"
                     aria-label={`${asset.ticker} ${t('price')}`}
                   >
                     <div className="col-span-5 min-w-0 flex items-center gap-3">
@@ -781,7 +771,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
             <div className="h-24" />
               </>
             ) : primaryTab === 'favorites' && !searchQuery.trim() ? (
-              <div className="flex flex-col items-center justify-center py-14 px-6 text-center rounded-2xl bg-surfaceElevated">
+              <div className="flex flex-col items-center justify-center py-14 px-6 text-center rounded-xl bg-surfaceElevated">
                 <Star size={36} className="text-textMuted opacity-35 mb-3" />
                 <p className="text-sm text-textSubtle leading-relaxed max-w-xs">{t('markets_favorites_empty_hint')}</p>
               </div>

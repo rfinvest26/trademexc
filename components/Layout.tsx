@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MessageCircle, Mail } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import BottomNav from './BottomNav';
 import SidebarNav from './SidebarNav';
 import { PageView } from '../types';
@@ -8,6 +8,7 @@ import { useFullscreenSheetLock } from '../context/FullscreenSheetLockContext';
 import { Haptic } from '../utils/haptics';
 import { useHideOnScroll } from '../utils/useHideOnScroll';
 import { useUser } from '../context/UserContext';
+import SideMenuDrawer from './SideMenuDrawer';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -16,7 +17,7 @@ interface LayoutProps {
   hideNavigation?: boolean;
 }
 
-const PAGES_WITHOUT_BOTTOM_NAV: PageView[] = ['KYC', 'CURRENCY', 'LANGUAGE', 'SUPPORT'];
+const PAGES_WITHOUT_BOTTOM_NAV: PageView[] = ['KYC', 'CURRENCY', 'LANGUAGE', 'NFT_CHAT'];
 
 const Layout: React.FC<LayoutProps> = ({ children, currentPage, onNavigate, hideNavigation = false }) => {
   const { user } = useUser();
@@ -27,7 +28,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onNavigate, hide
     keyboardOpen ||
     hideNavigation ||
     fullscreenDockLockCount > 0;
-  const pageHasOwnScroll = currentPage === 'SUPPORT';
+  const pageHasOwnScroll = false;
   const bottomNavHiddenByScroll = useHideOnScroll({ scrollerId: 'app-scroll', thresholdPx: 10, topRevealPx: 18 });
   const [p2pSummary, setP2pSummary] = useState<{
     amount: number;
@@ -124,24 +125,15 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onNavigate, hide
       <main
         id="app-scroll"
         className={`flex-1 w-full relative z-10 no-scrollbar scroll-smooth overscroll-contain scroll-app transition-[padding] duration-150
-          max-w-full lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto
-          ${hideBottomNav ? 'pb-0' : 'pb-[4.5rem] lg:pb-8'}
+          ${hideBottomNav ? 'pb-0' : 'pb-[4.5rem] lg:pb-0'}
           ${pageHasOwnScroll ? 'overflow-hidden flex flex-col min-h-0' : 'overflow-y-auto'}
         `}
         style={effectiveMainPaddingBottom != null ? { paddingBottom: effectiveMainPaddingBottom } : undefined}
       >
         {pageHasOwnScroll ? <div className="flex-1 min-h-0">{children}</div> : children}
-        {!hideBottomNav && currentPage === 'PROFILE' && (
-          <button
-            type="button"
-            onClick={() => { Haptic.tap(); onNavigate('SUPPORT'); }}
-            className="fixed bottom-20 right-4 lg:bottom-8 lg:right-8 z-40 h-12 w-12 rounded-full bg-surfaceElevated/95 backdrop-blur-md ring-1 ring-white/5 text-textPrimary flex items-center justify-center active:scale-95 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:bg-surfaceElevated cursor-pointer"
-            aria-label="Чат поддержки"
-          >
-            <MessageCircle size={22} strokeWidth={2} />
-          </button>
-        )}
       </main>
+
+      <SideMenuDrawer onNavigate={onNavigate} />
 
           {!hideBottomNav && (
         <div
@@ -155,7 +147,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onNavigate, hide
                 Haptic.tap();
                 onNavigate('DEPOSIT');
               }}
-              className="mx-3 mb-2 mt-1 w-auto rounded-2xl px-3 py-2.5 flex flex-col gap-1.5 text-left p2p-banner active:scale-[0.99] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg cursor-pointer"
+              className="app-panel mx-3 mb-2 mt-1 w-auto rounded-xl px-3 py-2.5 flex flex-col gap-1.5 text-left app-border active:scale-[0.99] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg cursor-pointer"
             >
               {/* Status row */}
               <div className="flex items-center gap-2">
@@ -173,9 +165,9 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onNavigate, hide
               </div>
               {/* User info row */}
               {user?.email && (
-                <span className="user-chip">
+                <span className="app-chip max-w-[200px]">
                   <Mail size={9} className="flex-shrink-0" />
-                  {user.email}
+                  <span className="truncate">{user.email}</span>
                 </span>
               )}
             </button>

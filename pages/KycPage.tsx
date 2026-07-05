@@ -9,6 +9,7 @@ import { logAction } from '../lib/appLog';
 import { createSupportMessages, ensureSupportThread, touchSupportThread } from '../lib/services/supportService';
 import Modal from '../components/Modal';
 import { uploadPublicFile } from '../lib/services/storageService';
+import AppInput from '../components/AppInput';
 
 type KycStep = 'DOC_TYPE' | 'NAME' | 'DOC_PHOTO' | 'SELFIE' | 'SUCCESS';
 
@@ -244,9 +245,9 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
                 <button
                   key={d.id}
                   onClick={() => { Haptic.light(); setDocType(d.id); setStep('NAME'); }}
-                  className="w-full bg-card border border-border rounded-2xl p-4 flex items-center gap-4 hover:border-neon/60 hover:bg-surfaceElevated transition-all active:scale-[0.98] text-left group"
+                  className="w-full bg-card app-border rounded-xl p-4 flex items-center gap-4 hover:border-neon/60 hover:bg-surfaceElevated transition-all active:scale-[0.98] text-left group"
                 >
-                  <div className="w-12 h-12 rounded-xl bg-[#0a0d14] border border-border flex items-center justify-center flex-shrink-0 group-hover:border-neon">
+                  <div className="w-12 h-12 rounded-xl bg-[#0a0d14] app-border flex items-center justify-center flex-shrink-0 group-hover:border-neon">
                     <FileText size={22} className="text-neon" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -266,23 +267,22 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
               <h2 className="text-xl font-bold text-textPrimary mb-1">{t('kyc_name_title')}</h2>
               <p className="text-textMuted text-sm">{t('kyc_name_desc')}</p>
             </div>
-            <div className="bg-card border border-border rounded-2xl p-4">
+            <div className="bg-card app-border rounded-xl p-4">
               <label className="flex items-center gap-2 text-xs text-textMuted uppercase font-bold mb-2">
                 <User size={14} />
                 {t('kyc_fullname')}
               </label>
-              <input
+              <AppInput
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder={t('kyc_fullname_placeholder')}
-                className="w-full"
               />
             </div>
             <button
               onClick={() => { Haptic.light(); setStep('DOC_PHOTO'); }}
               disabled={!fullName.trim()}
-              className="w-full py-4 bg-neon text-black font-bold rounded-full flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none"
+              className="app-button-primary w-full"
             >
               {t('next')} <ChevronRight size={18} />
             </button>
@@ -295,16 +295,16 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
               <h2 className="text-xl font-bold text-textPrimary mb-1">{t('kyc_doc_photo_title')}</h2>
               <p className="text-textMuted text-sm">{t('kyc_doc_photo_desc')}</p>
             </div>
-            <label className="block bg-card border border-dashed border-border rounded-2xl p-8 text-center cursor-pointer hover:border-neon/60 hover:bg-surfaceElevated active:scale-[0.99] transition-all">
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
+            <label className="block bg-card border border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-neon/60 hover:bg-surfaceElevated active:scale-[0.99] transition-all">
+              {React.createElement('input', {
+                type: 'file',
+                accept: 'image/*',
+                className: 'hidden',
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
                   const f = e.target.files?.[0];
                   if (f) { Haptic.light(); setDocFile(f); setStep('SELFIE'); }
-                }}
-              />
+                },
+              })}
               {docFile ? (
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center">
@@ -315,7 +315,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-14 h-14 rounded-full bg-[#0a0d14] border border-border flex items-center justify-center">
+                  <div className="w-14 h-14 rounded-full bg-[#0a0d14] app-border flex items-center justify-center">
                     <Image size={28} className="text-textMuted" />
                   </div>
                   <span className="text-textPrimary font-medium">{t('kyc_upload_photo')}</span>
@@ -334,7 +334,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
             </div>
 
             {/* Превью снимка или видео с камеры */}
-            <div className="relative w-full rounded-2xl overflow-hidden bg-black border border-border aspect-[3/4] max-h-[360px] flex items-center justify-center">
+            <div className="relative w-full rounded-xl overflow-hidden bg-black app-border aspect-[3/4] max-h-[360px] flex items-center justify-center">
               {selfieFile && selfiePreviewUrl ? (
                 <img
                   src={selfiePreviewUrl}
@@ -364,7 +364,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
                 <button
                   type="button"
                   onClick={startCamera}
-                  className="w-full py-4 bg-neon text-black font-bold rounded-full flex items-center justify-center gap-2 active:scale-95 transition-all"
+                  className="app-button-primary w-full"
                 >
                   <Camera size={22} /> {t('kyc_turn_on_camera')}
                 </button>
@@ -373,7 +373,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
                 <button
                   type="button"
                   onClick={captureSelfie}
-                  className="w-full py-4 bg-neon text-black font-bold rounded-full flex items-center justify-center gap-2 active:scale-95 transition-all"
+                  className="app-button-primary w-full"
                 >
                   <Camera size={22} /> {t('kyc_take_photo')}
                 </button>
@@ -385,7 +385,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
                     type="button"
                     onClick={handleSubmit}
                     disabled={submitting}
-                    className="w-full py-4 bg-neon text-black font-bold rounded-full flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none"
+                    className="app-button-primary w-full"
                   >
                     {submitting ? (
                       t('kyc_submitting')
@@ -398,7 +398,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
                   <button
                     type="button"
                     onClick={retakeSelfie}
-                    className="w-full py-3 text-textSecondary hover:text-textPrimary text-sm font-medium rounded-full border border-border bg-card hover:bg-surfaceElevated active:scale-95 transition-all"
+                    className="app-button-secondary w-full"
                   >
                     {t('kyc_retake')}
                     </button>
@@ -410,7 +410,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
         )}
 
         {step === 'SUCCESS' && (
-          <div className="bg-card border border-border rounded-2xl p-8 text-center">
+          <div className="bg-card app-border rounded-xl p-8 text-center">
             <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-5">
               <ShieldCheck size={40} className="text-up" />
             </div>
@@ -418,7 +418,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
               <>
                 <h2 className="text-xl font-bold text-textPrimary mb-2">{t('kyc_success_title')}</h2>
                 <p className="text-textMuted text-sm mb-6">{t('kyc_success_desc')}</p>
-                <button onClick={() => { Haptic.tap(); onBack(); }} className="w-full py-4 bg-neon text-black font-bold rounded-full active:scale-95 transition-all">
+                <button onClick={() => { Haptic.tap(); onBack(); }} className="app-button-primary w-full">
                   {t('kyc_to_profile')}
                 </button>
               </>
@@ -429,7 +429,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
                 <button
                   onClick={handleSubmit}
                   disabled={submitting}
-                  className="w-full py-4 bg-neon text-black font-bold rounded-full disabled:opacity-50 active:scale-95 transition-all"
+                  className="app-button-primary w-full"
                 >
                   {submitting ? t('kyc_submitting') : t('kyc_submit_btn')}
                 </button>
@@ -456,7 +456,7 @@ const KycPage: React.FC<KycPageProps> = ({ onBack }) => {
           <button
             type="button"
             onClick={() => setShowExitConfirm(false)}
-            className="flex-1 py-2.5 rounded-full border border-border bg-surfaceElevated text-textSecondary text-sm font-medium active:scale-95 transition-all"
+            className="flex-1 py-2.5 rounded-full app-border bg-surfaceElevated text-textSecondary text-sm font-medium active:scale-95 transition-all"
           >
             {t('cancel')}
           </button>

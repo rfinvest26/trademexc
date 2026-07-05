@@ -14,6 +14,7 @@ import {
   Coins,
 } from 'lucide-react';
 import Skeleton from '../components/Skeleton';
+import AppEmptyState from '../components/AppEmptyState';
 import { Haptic } from '../utils/haptics';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -27,8 +28,10 @@ import {
   getAllNftListings,
   nftListingToAsset,
   nftTickerForListing,
+  slugifyCollectionName,
   type NftListingRow,
 } from '../lib/nftCatalog';
+import { getMyNftOwned, nftOwnedStatusMeta, type NftOwnedRow, type NftStatusTone } from '../lib/nftOrders';
 
 interface DealsPageProps {
   deals: Deal[];
@@ -37,11 +40,59 @@ interface DealsPageProps {
   spotHoldings: SpotHolding[];
   userId: number;
   onNavigateToTrading: (asset: Asset, options?: NavigateToTradingOptions) => void;
+  onOpenNftHub?: () => void;
   onDeposit?: () => void;
   onWithdraw?: () => void;
 }
 
 type TabId = 'ACTIVE' | 'HISTORY' | 'ASSETS';
+
+type PortfolioNftRow = {
+  key: string;
+  source: 'spot' | 'owned';
+  asset: Asset;
+  collectionName: string;
+  codeDisplay: string;
+  imageUrl?: string | null;
+  quantityLabel: string;
+  price: number;
+  valueUsd: number;
+  statusLabel: string;
+  statusTone: NftStatusTone;
+  subtitle: string;
+};
+
+function statusToneClass(tone: NftStatusTone): string {
+  switch (tone) {
+    case 'pending':
+      return 'bg-amber-400/10 text-amber-300 ring-amber-300/15';
+    case 'success':
+      return 'bg-emerald-400/10 text-emerald-300 ring-emerald-300/15';
+    case 'danger':
+      return 'bg-red-400/10 text-red-300 ring-red-300/15';
+    case 'market':
+      return 'bg-accent/10 text-accent ring-accent/15';
+    default:
+      return 'bg-white/[0.04] text-textMuted ring-border';
+  }
+}
+
+function ownedNftToListing(row: NftOwnedRow): NftListingRow {
+  const collectionName = String(row.collection_name ?? 'NFT').trim() || 'NFT';
+  const rawCode = String(row.nft_code ?? row.id).trim() || String(row.id);
+  const codeKey = rawCode.replace(/^#/, '').trim() || String(row.id);
+  const priceUsd = Number(row.list_price_usd ?? row.acquired_price_usd ?? 0);
+  return {
+    listingDbId: row.nft_listing_id,
+    collectionName,
+    collectionSlug: slugifyCollectionName(collectionName),
+    codeDisplay: rawCode.startsWith('#') ? rawCode : `#${rawCode}`,
+    codeKey,
+    priceEth: 0,
+    imageUrl: row.image_url || '',
+    customPriceUsd: Number.isFinite(priceUsd) && priceUsd > 0 ? priceUsd : undefined,
+  };
+}
 
 const DealsPage: React.FC<DealsPageProps> = ({
   deals,
@@ -50,6 +101,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
   spotHoldings,
   userId,
   onNavigateToTrading,
+  onOpenNftHub,
   onDeposit,
   onWithdraw,
 }) => {
@@ -63,6 +115,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
   const jitter = useNftMarketJitter();
   const [activityHistory, setActivityHistory] = useState<ActivityHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [ownedNfts, setOwnedNfts] = useState<NftOwnedRow[]>([]);
   const liveAssets = useLiveAssets(MARKET_ASSETS);
 
   const assetsByTicker = useMemo(() => {
@@ -79,9 +132,28 @@ const DealsPage: React.FC<DealsPageProps> = ({
     return map;
   }, []);
 
-  const nftPortfolioRows = useMemo(() => {
-    const rows = spotHoldings
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      if (!userId) {
+        if (alive) setOwnedNfts([]);
+        return;
+      }
+      const rows = await getMyNftOwned(userId, 100);
+      if (alive) setOwnedNfts(rows);
+    };
+    void load();
+    const intervalId = window.setInterval(load, 7000);
+    return () => {
+      alive = false;
+      window.clearInterval(intervalId);
+    };
+  }, [userId]);
+
+  const nftPortfolioRows = useMemo<PortfolioNftRow[]>(() => {
+    const spotNftRows: PortfolioNftRow[] = spotHoldings
       .map((h) => {
+        if ((h.amount ?? 0) <= 1e-6) return null;
         const row = nftListingBySpotTicker.get(h.ticker);
         if (!row) return null;
         const live = assetsByTicker[h.ticker];
@@ -89,27 +161,69 @@ const DealsPage: React.FC<DealsPageProps> = ({
         const baseUsd =
           ethUsdNft > 0
             ? rowPriced.priceEth * ethUsdNft
-            : Math.max(h.avgPriceRub ?? 0, rowPriced.priceEth * 320_000, live?.price ?? 0, 1);
+            : Math.max(h.avgPriceUsd ?? 0, rowPriced.priceEth * 3_200, live?.price ?? 0, 1);
         const priceUsd =
           Number.isFinite(baseUsd) && baseUsd > 0
             ? withNftDisplayWobbleUsd(baseUsd, h.ticker, now)
-            : Math.max(h.avgPriceRub ?? 0, 1);
+            : Math.max(h.avgPriceUsd ?? 0, 1);
         const asset = nftListingToAsset(rowPriced, Math.max(priceUsd, 1));
-        const valueUsd = (h.amount ?? 0) * (priceUsd > 0 ? priceUsd : h.avgPriceRub ?? 0);
-        return { holding: h, asset, row, price: priceUsd || h.avgPriceRub, valueUsd };
+        const valueUsd = (h.amount ?? 0) * (priceUsd > 0 ? priceUsd : h.avgPriceUsd ?? 0);
+        const qtyRounded = Math.round((h.amount ?? 0) * 1000) / 1000;
+        const quantityLabel =
+          Math.abs(qtyRounded - Math.floor(qtyRounded + 1e-9)) < 1e-6
+            ? String(Math.floor(qtyRounded + 1e-9))
+            : qtyRounded.toFixed(3).replace(/\.?0+$/, '');
+        return {
+          key: `spot-${h.ticker}`,
+          source: 'spot' as const,
+          asset,
+          collectionName: row.collectionName,
+          codeDisplay: row.codeDisplay,
+          imageUrl: row.imageUrl,
+          quantityLabel,
+          price: priceUsd || h.avgPriceUsd,
+          valueUsd,
+          statusLabel: 'Спот',
+          statusTone: 'market' as const,
+          subtitle: t('portfolio_units_label'),
+        };
       })
       .filter((r): r is NonNullable<typeof r> => r != null)
-      .filter((r) => Number.isFinite(r.valueUsd) && (r.holding.amount ?? 0) > 1e-6);
+      .filter((r) => Number.isFinite(r.valueUsd));
+    const ownedRows: PortfolioNftRow[] = ownedNfts
+      .filter((row) => row.status !== 'sold')
+      .map((row) => {
+        const meta = nftOwnedStatusMeta(row.status);
+        const listing = ownedNftToListing(row);
+        const price = Number(row.list_price_usd ?? row.acquired_price_usd ?? listing.customPriceUsd ?? 0);
+        const priceSafe = Number.isFinite(price) && price > 0 ? price : 1;
+        const asset = nftListingToAsset(listing, priceSafe);
+        return {
+          key: `owned-${row.id}`,
+          source: 'owned' as const,
+          asset,
+          collectionName: listing.collectionName,
+          codeDisplay: listing.codeDisplay,
+          imageUrl: listing.imageUrl,
+          quantityLabel: '1',
+          price: priceSafe,
+          valueUsd: priceSafe,
+          statusLabel: meta.label,
+          statusTone: meta.tone,
+          subtitle: row.is_user_created ? 'Создан вами' : meta.detail,
+        };
+      });
+    const rows = [...spotNftRows, ...ownedRows];
     rows.sort((a, b) => b.valueUsd - a.valueUsd);
     return rows;
-  }, [spotHoldings, assetsByTicker, nftListingBySpotTicker, now, ethUsdNft, refNftPriceMap]);
+  }, [spotHoldings, ownedNfts, assetsByTicker, nftListingBySpotTicker, now, ethUsdNft, refNftPriceMap, refNftPriceUsdMap, jitter, t]);
 
   const spotRows = useMemo(() => {
     const rows = spotHoldings
       .filter((h) => !nftListingBySpotTicker.has(h.ticker))
       .map((h) => {
         const live = assetsByTicker[h.ticker];
-        const price = live?.price ?? h.avgPriceRub ?? 0;
+        const price = live?.price ?? h.avgPriceUsd ?? 0;
         const valueUsd = (h.amount ?? 0) * price;
         const asset: Asset =
           live ??
@@ -182,7 +296,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
       0
     );
     const nftDay = nftPortfolioRows.reduce((s, r) => {
-      const chTicker = assetsByTicker[r.holding.ticker]?.change24h ?? assetsByTicker.ETH?.change24h ?? 0;
+      const chTicker = assetsByTicker[r.asset.ticker]?.change24h ?? assetsByTicker.ETH?.change24h ?? 0;
       return s + (r.valueUsd ?? 0) * ((chTicker as number) / 100);
     }, 0);
     return spotCrypto + nftDay;
@@ -231,22 +345,24 @@ const DealsPage: React.FC<DealsPageProps> = ({
     return d.toLocaleString(lang, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   };
 
+  const assetRowsCount = nftPortfolioRows.length + spotRows.length;
+
   const tabs: { id: TabId; label: string; count: number }[] = [
     { id: 'ACTIVE', label: t('active_tab'), count: activeDeals.length },
     { id: 'HISTORY', label: t('history_tab'), count: activityHistory.length },
-    { id: 'ASSETS', label: t('my_assets'), count: spotHoldings.length },
+    { id: 'ASSETS', label: t('my_assets'), count: assetRowsCount },
   ];
 
   return (
     <div className="flex flex-col h-full min-h-0 animate-fade-in bg-background">
       {/* Wallet / Portfolio header (минималистично, как на бирже) */}
-      <header className="shrink-0 px-4 pt-4 pb-4 bg-background/95 backdrop-blur-md border-b border-white/5">
+      <header className="shrink-0 px-4 pt-4 pb-4 bg-background/95 backdrop-blur-md border-b border-border">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[10px] uppercase tracking-[0.18em] text-textSubtle leading-none">{t('portfolio_title')}</p>
             <div className="flex items-baseline gap-2 mt-1 min-w-0">
               {balanceLoading ? (
-                <Skeleton className="w-44 h-10 rounded-2xl bg-surfaceElevated/70" />
+                <Skeleton className="w-44 h-10 rounded-xl bg-surfaceElevated/70" />
               ) : (
                 <span className="text-[34px] lg:text-[38px] font-bold tracking-tight text-textPrimary tabular-nums leading-[1] truncate">
                   {formatPrice(totalPortfolioUsd, { fractionDigits: 2 })}
@@ -275,7 +391,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
           </div>
 
           {activeDeals.length > 0 && (
-            <div className="text-right shrink-0 rounded-2xl bg-surfaceElevated/70 ring-1 ring-white/5 px-3 py-2">
+            <div className="text-right shrink-0 rounded-xl bg-surfaceElevated/70 px-3 py-2">
               <p className="text-[10px] uppercase tracking-wider text-textMuted">P&L</p>
               <p className={`text-sm font-mono font-bold tabular-nums ${totalPnlActive >= 0 ? 'text-up' : 'text-down'}`}>
                 {totalPnlActive >= 0 ? '+' : ''}
@@ -290,7 +406,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
           <button
             type="button"
             onClick={() => { Haptic.tap(); onDeposit?.(); }}
-            className="flex-1 h-11 rounded-full bg-up/10 text-up text-[13px] font-semibold active:scale-[0.98] transition-all duration-200 hover:bg-up/15 hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+            className="app-button-primary flex-1 gap-2"
           >
             <ArrowDownLeft size={16} />
             {t('quick_deposit')}
@@ -298,29 +414,23 @@ const DealsPage: React.FC<DealsPageProps> = ({
           <button
             type="button"
             onClick={() => { Haptic.tap(); onWithdraw?.(); }}
-            className="flex-1 h-11 rounded-full bg-surfaceElevated text-textPrimary text-[13px] font-semibold active:scale-95 transition-all duration-200 hover:bg-surface hover:shadow-lg ring-1 ring-white/5 flex items-center justify-center gap-2 cursor-pointer"
+            className="app-button-secondary flex-1 gap-2"
           >
             <ArrowUpRightIcon size={16} />
             {t('quick_withdraw')}
           </button>
         </div>
 
-        <div className="flex gap-1 mt-4 p-1.5 rounded-full bg-surfaceElevated ring-1 ring-white/5">
+        <div className="app-tabs mt-2 -mx-0">
           {tabs.map(({ id, label, count }) => (
             <button
               key={id}
               type="button"
               onClick={() => { Haptic.tap(); setActiveTab(id); }}
-              className={`flex-1 py-2.5 px-2 text-xs font-medium rounded-full transition-all duration-200 active:scale-95 cursor-pointer ${
-                activeTab === id
-                  ? 'bg-background text-textPrimary shadow-sm'
-                  : 'text-textMuted hover:text-textSecondary hover:bg-white/[0.03]'
-              }`}
+              className={`app-tab ${activeTab === id ? 'app-tab-active' : ''}`}
             >
-              <span className="inline-flex items-center justify-center gap-1.5 min-w-0">
-                <span className="truncate">{label}</span>
-                <span className="text-[10px] font-mono opacity-70">{count}</span>
-              </span>
+              {label}
+              {count > 0 && <span className="text-[10px] font-mono opacity-60 ml-1">{count}</span>}
             </button>
           ))}
         </div>
@@ -332,22 +442,19 @@ const DealsPage: React.FC<DealsPageProps> = ({
         {activeTab === 'ACTIVE' && (
           <div className="px-4 py-3">
             {activeDeals.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-20 text-center px-4">
-                <div className="relative w-24 h-24 flex items-center justify-center mb-5">
-                  <div className="absolute inset-0 bg-up/10 rounded-full blur-xl opacity-70 animate-pulse-ring" />
-                  <div className="w-16 h-16 rounded-[1.5rem] bg-surfaceElevated ring-1 ring-white/5 flex items-center justify-center relative z-10 shadow-elevation-2">
-                    <TrendingUp size={28} strokeWidth={1.5} className="text-up opacity-80" aria-hidden />
-                  </div>
-                </div>
-                <p className="text-sm font-semibold text-textPrimary">{t('no_open_positions')}</p>
-                <p className="text-[11px] text-textMuted mt-1 max-w-[200px]">{t('portfolio_empty_active_hint')}</p>
-              </div>
+              <AppEmptyState
+                icon={TrendingUp}
+                tone="up"
+                pulse
+                title={t('no_open_positions')}
+                hint={t('portfolio_empty_active_hint')}
+              />
             )}
 
             {activeDeals.length > 0 && (
-              <div className="rounded-2xl bg-surfaceElevated overflow-hidden ring-1 ring-white/5">
+              <div className="rounded-xl overflow-hidden">
                 {/* Заголовки колонок */}
-                <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-2 px-3 py-2.5 border-b border-white/5 bg-background/20 text-[10px] font-semibold uppercase tracking-[0.16em] text-textMuted">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-2 px-3 py-2.5 border-b border-border bg-surfaceElevated text-[10px] font-semibold uppercase tracking-[0.14em] text-textMuted">
                   <span>Пара / Направление</span>
                   <span className="text-right">Вход</span>
                   <span className="text-right">P&L</span>
@@ -360,14 +467,14 @@ const DealsPage: React.FC<DealsPageProps> = ({
                   return (
                     <div
                       key={deal.id}
-                      className={`grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-2 px-3 py-3 border-b border-white/5 last:border-b-0 items-center min-h-[58px] transition-colors duration-200 hover:bg-white/[0.03] ${
+                      className={`grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-2 px-3 py-3 border-b border-border last:border-b-0 items-center min-h-[56px] transition-colors duration-200 hover:bg-surfaceElevated/60 ${
                         isProfitable ? 'bg-up/[0.02]' : 'bg-down/[0.02]'
                       }`}
                     >
                       <div className="min-w-0 flex flex-col gap-0.5">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-sm text-textPrimary truncate">{deal.assetTicker}</span>
-                          <span className="shrink-0 text-[10px] font-mono text-textMuted bg-white/[0.04] px-1.5 py-0.5 rounded-full ring-1 ring-white/5">
+                          <span className="shrink-0 text-[10px] font-mono text-textMuted bg-white/[0.04] px-1.5 py-0.5 rounded-full">
                             x{deal.leverage}
                           </span>
                         </div>
@@ -436,7 +543,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
         {activeTab === 'HISTORY' && (
           <div className="px-4 py-3">
             {historyLoading && (
-              <div className="overflow-hidden rounded-2xl bg-surfaceElevated ring-1 ring-white/5">
+              <div className="overflow-hidden rounded-xl bg-surfaceElevated">
                 {Array.from({ length: 3 }).map((_, idx) => (
                   <Skeleton key={`history-skeleton-${idx}`} className="w-full h-14 bg-surface" />
                 ))}
@@ -444,16 +551,12 @@ const DealsPage: React.FC<DealsPageProps> = ({
             )}
 
             {!historyLoading && activityHistory.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-20 text-center px-4">
-                <div className="relative w-24 h-24 flex items-center justify-center mb-5">
-                  <div className="absolute inset-0 bg-neon/10 rounded-full blur-xl opacity-70" />
-                  <div className="w-16 h-16 rounded-[1.5rem] bg-surfaceElevated ring-1 ring-white/5 flex items-center justify-center relative z-10 shadow-elevation-2">
-                    <History size={28} strokeWidth={1.5} className="text-neon opacity-80" aria-hidden />
-                  </div>
-                </div>
-                <p className="text-sm font-semibold text-textPrimary">{t('history_empty')}</p>
-                <p className="text-[11px] text-textMuted mt-1 max-w-[200px]">{t('portfolio_empty_history_hint')}</p>
-              </div>
+              <AppEmptyState
+                icon={History}
+                tone="neon"
+                title={t('history_empty')}
+                hint={t('portfolio_empty_history_hint')}
+              />
             )}
 
             {!historyLoading && activityHistory.length > 0 && (
@@ -478,7 +581,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
                   return (
                     <div
                       key={`${item.id}-${item.created_at}`}
-                      className="flex items-center justify-between gap-3 px-4 py-3 min-h-[56px] rounded-2xl hover:bg-white/[0.03] transition-colors duration-200"
+                      className="flex items-center justify-between gap-3 px-4 py-3 min-h-[56px] rounded-xl hover:bg-white/[0.03] transition-colors duration-200"
                     >
                       <div className="min-w-0 flex-1">
                         <p className={`text-xs font-medium ${isGreen ? 'text-up' : isRed ? 'text-down' : 'text-textSecondary'}`}>
@@ -520,20 +623,16 @@ const DealsPage: React.FC<DealsPageProps> = ({
         {/* ——— Мои активы (спот) ——— */}
         {activeTab === 'ASSETS' && (
           <div className="px-4 py-3">
-            {spotHoldings.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-20 text-center px-4">
-                <div className="relative w-24 h-24 flex items-center justify-center mb-5">
-                  <div className="absolute inset-0 bg-purple-500/10 rounded-full blur-xl opacity-70" />
-                  <div className="w-16 h-16 rounded-[1.5rem] bg-surfaceElevated ring-1 ring-white/5 flex items-center justify-center relative z-10 shadow-elevation-2">
-                    <Wallet size={28} strokeWidth={1.5} className="text-purple-400 opacity-80" aria-hidden />
-                  </div>
-                </div>
-                <p className="text-sm font-semibold text-textPrimary">{t('no_spot_assets')}</p>
-                <p className="text-[11px] text-textMuted mt-1 max-w-[200px]">{t('portfolio_empty_spot_hint')}</p>
-              </div>
+            {assetRowsCount === 0 && (
+              <AppEmptyState
+                icon={Wallet}
+                tone="purple"
+                title={t('no_spot_assets')}
+                hint={t('portfolio_empty_spot_hint')}
+              />
             )}
 
-            {spotHoldings.length > 0 && (nftPortfolioRows.length > 0 || spotRows.length > 0) && (
+            {assetRowsCount > 0 && (
               <div className="space-y-7">
                 {(nftPortfolioRows.length > 0 || spotRows.length > 0) && (
                   <div
@@ -542,7 +641,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
                     }`}
                   >
                     {nftPortfolioRows.length > 0 ? (
-                      <div className="rounded-2xl px-3.5 py-3 bg-surfaceElevated ring-1 ring-white/5">
+                      <div className="rounded-xl px-3.5 py-3 bg-surfaceElevated">
                         <p className="text-[10px] uppercase tracking-wide text-textMuted font-semibold">
                           {t('portfolio_split_nft_value')}
                         </p>
@@ -555,7 +654,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
                       </div>
                     ) : null}
                     {spotRows.length > 0 ? (
-                      <div className="rounded-2xl px-3.5 py-3 bg-surfaceElevated ring-1 ring-white/5">
+                      <div className="rounded-xl px-3.5 py-3 bg-surfaceElevated">
                         <p className="text-[10px] uppercase tracking-wide text-textMuted font-semibold">
                           {t('portfolio_split_spot_value')}
                         </p>
@@ -584,7 +683,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
                           <h3 className="text-[15px] font-bold text-textPrimary tracking-tight">
                             {t('portfolio_my_nfts')}
                           </h3>
-                          <span className="text-[10px] font-mono px-2 py-px rounded-full bg-white/[0.04] ring-1 ring-white/5 text-textMuted">
+                          <span className="text-[10px] font-mono px-2 py-px rounded-full bg-white/[0.04] text-textMuted">
                             {nftPortfolioRows.length}
                           </span>
                         </div>
@@ -593,44 +692,56 @@ const DealsPage: React.FC<DealsPageProps> = ({
                     </div>
                   </div>
                   {nftPortfolioRows.length === 0 ? (
-                    <div className="rounded-2xl px-4 py-3 bg-surfaceElevated ring-1 ring-white/5">
+                    <div className="rounded-xl px-4 py-3 bg-surfaceElevated">
                       <p className="text-xs text-textMuted leading-snug">{t('portfolio_nfts_hint')}</p>
                     </div>
                   ) : (
-                    <div className="rounded-2xl overflow-hidden bg-surfaceElevated ring-1 ring-white/5 divide-y divide-white/5">
-                      {nftPortfolioRows.map(({ holding, asset, row, price, valueUsd }) => {
-                        const qtyRounded = Math.round((holding.amount ?? 0) * 1000) / 1000;
-                        const qtyLabel =
-                          Math.abs(qtyRounded - Math.floor(qtyRounded + 1e-9)) < 1e-6
-                            ? String(Math.floor(qtyRounded + 1e-9))
-                            : qtyRounded.toFixed(3).replace(/\.?0+$/, '');
+                    <div className="rounded-xl overflow-hidden bg-surfaceElevated divide-y divide-border">
+                      {nftPortfolioRows.map(({ key, source, asset, collectionName, codeDisplay, imageUrl, quantityLabel, price, valueUsd, statusLabel, statusTone, subtitle }) => {
                         return (
                           <button
-                            key={holding.ticker}
+                            key={key}
                             type="button"
                             onClick={() => {
                               Haptic.tap();
-                              onNavigateToTrading(asset, { tradeType: 'spot', spotAction: 'sell' });
+                              if (source === 'owned') {
+                                onOpenNftHub?.();
+                              } else {
+                                onNavigateToTrading(asset, { tradeType: 'spot', spotAction: 'sell' });
+                              }
                             }}
                             className="w-full text-left px-3 py-3 flex items-center gap-3 min-h-[64px] active:bg-white/[0.04] hover:bg-white/[0.03] transition-all duration-200 cursor-pointer"
-                            aria-label={`${row.collectionName} ${row.codeDisplay} · ${t('sell')}`}
+                            aria-label={`${collectionName} ${codeDisplay}`}
                           >
-                            <div className="h-12 w-12 shrink-0 rounded-xl bg-background/40 overflow-hidden relative ring-1 ring-white/5">
-                              <img
-                                src={row.imageUrl}
-                                alt=""
-                                className="absolute inset-0 h-full w-full object-cover"
-                                loading="lazy"
-                              />
+                            <div className="h-12 w-12 shrink-0 rounded-xl bg-background/40 overflow-hidden relative">
+                              {imageUrl ? (
+                                <img
+                                  src={imageUrl}
+                                  alt=""
+                                  className="absolute inset-0 h-full w-full object-cover"
+                                  loading="lazy"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                <div className="absolute inset-0 flex items-center justify-center text-[10px] font-mono text-textMuted">
+                                  NFT
+                                </div>
+                              )}
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-mono text-[14px] font-bold text-textPrimary">{row.codeDisplay}</span>
-                                <span className="text-[10px] text-textMuted truncate">{row.collectionName}</span>
+                                <span className="font-mono text-[14px] font-bold text-textPrimary">{codeDisplay}</span>
+                                <span className="text-[10px] text-textMuted truncate">{collectionName}</span>
+                                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ${statusToneClass(statusTone)}`}>
+                                  {statusLabel}
+                                </span>
                               </div>
                               <p className="text-[11px] text-textMuted font-mono mt-0.5 tabular-nums">
-                                {qtyLabel} {t('portfolio_units_label')} · {price > 0 ? formatPrice(price) : '—'} {symbol}
+                                {quantityLabel} {t('portfolio_units_label')} · {price > 0 ? formatPrice(price) : '—'} {symbol}
                               </p>
+                              {source === 'owned' && (
+                                <p className="text-[10px] text-textMuted mt-0.5 truncate">{subtitle}</p>
+                              )}
                             </div>
                             <div className="text-right shrink-0 flex items-center gap-2">
                               <div>
@@ -663,11 +774,11 @@ const DealsPage: React.FC<DealsPageProps> = ({
                     <span className="text-[10px] font-mono text-textMuted shrink-0">{spotRows.length}</span>
                   </div>
                   {spotRows.length === 0 ? (
-                    <div className="rounded-2xl px-4 py-3 bg-surfaceElevated ring-1 ring-white/5">
+                    <div className="rounded-xl px-4 py-3 bg-surfaceElevated">
                       <p className="text-xs text-textMuted">{t('portfolio_spot_empty_hint')}</p>
                     </div>
                   ) : (
-                    <div className="rounded-2xl overflow-hidden bg-surfaceElevated ring-1 ring-white/5 divide-y divide-white/5">
+                    <div className="rounded-xl overflow-hidden bg-surfaceElevated divide-y divide-border">
                       {spotRows.map(({ holding, asset, price, valueUsd }) => {
                         const initials = holding.ticker.slice(0, 3).toUpperCase();
                         return (
@@ -680,7 +791,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
                             }}
                             className="w-full text-left px-3 py-3.5 flex items-center gap-3 min-h-[64px] active:bg-white/[0.04] hover:bg-white/[0.03] transition-all duration-200 cursor-pointer"
                           >
-                            <div className="h-11 w-11 shrink-0 rounded-xl bg-background/40 ring-1 ring-white/5 flex items-center justify-center">
+                            <div className="h-11 w-11 shrink-0 rounded-xl bg-background/40 flex items-center justify-center">
                               <span className="text-[10px] font-mono font-bold text-textPrimary">{initials}</span>
                             </div>
                             <div className="min-w-0 flex-1">

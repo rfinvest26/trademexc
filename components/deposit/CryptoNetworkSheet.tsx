@@ -24,8 +24,8 @@ const CryptoNetworkSheet: React.FC<CryptoNetworkSheetProps> = ({
 
   return (
     <div className="px-4 lg:px-6 pb-2 animate-fade-in">
-      <div className="rounded-3xl bg-surfaceElevated overflow-hidden ring-1 ring-white/5">
-        <div className="border-b border-white/5 px-4 py-3">
+      <div className="rounded-xl bg-surfaceElevated overflow-hidden">
+        <div className="border-b border-border px-4 py-3">
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-textMuted">
             Выбор сети
           </p>
@@ -42,9 +42,9 @@ const CryptoNetworkSheet: React.FC<CryptoNetworkSheetProps> = ({
                 Haptic.light();
                 onSelect(net.id);
               }}
-              className="flex flex-col items-center rounded-2xl bg-surface px-3 py-4 transition-all duration-200 active:scale-[0.98] hover:bg-surfaceElevated hover:shadow-lg cursor-pointer"
+              className="flex flex-col items-center rounded-xl bg-surface px-3 py-4 transition-all duration-200 active:scale-[0.98] hover:bg-surfaceElevated hover:shadow-lg cursor-pointer"
             >
-              <div className="mb-2.5 flex h-11 w-11 items-center justify-center rounded-full bg-background/40 ring-1 ring-white/5 overflow-hidden">
+              <div className="mb-2.5 flex h-11 w-11 items-center justify-center rounded-full bg-background/40 overflow-hidden">
                 <img src={net.icon} alt="" className="h-7 w-7 object-contain" />
               </div>
               <span className="text-sm font-medium text-textPrimary">{net.label}</span>

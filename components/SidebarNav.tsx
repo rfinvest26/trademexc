@@ -27,64 +27,16 @@ const SidebarNav: React.FC<SidebarNavProps> = ({ currentPage, onNavigate }) => {
   const balanceLoading = Boolean(loading && user);
 
   return (
-    <aside className="hidden lg:flex flex-col w-60 min-w-[15rem] shrink-0 bg-background/80 backdrop-blur-md ring-1 ring-white/5">
-      <div className="sticky top-0 flex flex-col h-screen py-5 px-3">
+    <aside className="hidden lg:flex flex-col w-64 shrink-0 bg-surfaceElevated border-r border-border">
+      <div className="sticky top-0 flex flex-col h-screen py-6 px-4">
 
         {/* Brand */}
-        <div className="px-3 pb-4 mb-1 flex items-center">
-          <img src="/mexc-logo.svg" alt="MEXC" className="h-6 w-auto" draggable={false} />
+        <div className="px-2 pb-6 flex items-center">
+          <img src="/app-logo.svg" alt="MEXC" className="h-7 w-auto" draggable={false} />
         </div>
 
-        {/* User info block */}
-        {user ? (
-          <div className="px-3 pb-4 mb-2 border-b border-white/5">
-            <div className="flex items-center gap-2.5 mb-3">
-              <UserAvatar
-                name={displayName}
-                photoUrl={user.photo_url}
-                className="w-8 h-8"
-                imageClassName="border-border"
-                fallbackClassName="bg-surfaceElevated ring-1 ring-white/5 text-neon text-sm"
-                iconClassName="text-neon"
-                iconSize={12}
-              />
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-textPrimary truncate">{displayName}</p>
-                {user.email && isWebUser && (
-                  <p className="text-[10px] text-textMuted truncate">{user.email}</p>
-                )}
-              </div>
-            </div>
-            <div className="mb-2.5">
-              <p className="text-[10px] text-textMuted uppercase tracking-wide mb-0.5">{t('balance')}</p>
-              {balanceLoading ? (
-                <Skeleton className="w-24 h-5 rounded-lg bg-surface/60" />
-              ) : (
-                <p className="text-base font-bold text-neon font-mono">
-                  ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-              )}
-            </div>
-            <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
-              user.is_kyc ? 'bg-emerald-500/10 text-emerald-400' : 'bg-accentMuted text-neon'
-            }`}>
-              {user.is_kyc
-                ? <><ShieldCheck size={10} />{t('verified')}</>
-                : <><ShieldAlert size={10} />{t('verification_required')}</>
-              }
-            </div>
-          </div>
-        ) : (
-          <div className="px-3 pb-4 mb-2 border-b border-border flex items-center gap-2">
-            <User size={16} className="text-textMuted" />
-            <span className="text-xs text-textMuted">{t('guest')}</span>
-          </div>
-        )}
-
-        <UnifiedMarketsRibbon />
-
         {/* Nav items */}
-        <nav className="flex flex-col gap-0.5 flex-1">
+        <nav className="flex flex-col gap-1 flex-1">
           {navItems.map((item) => {
             const isActive = activeNav === item.id;
             const Icon = item.icon;
@@ -94,10 +46,10 @@ const SidebarNav: React.FC<SidebarNavProps> = ({ currentPage, onNavigate }) => {
                 key={item.id}
                 onClick={() => { Haptic.medium(); onNavigate(item.id); }}
                 title={item.label}
-                className={`cursor-pointer flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors duration-150 ${
+                className={`cursor-pointer flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all duration-200 ${
                   isActive
-                    ? 'bg-accentMuted text-textPrimary'
-                    : 'text-textSecondary hover:text-textPrimary hover:bg-surfaceElevated'
+                    ? 'bg-accent/10 text-accent font-bold'
+                    : 'text-textSecondary hover:text-textPrimary hover:bg-surface'
                 }`}
                 aria-current={isActive ? 'page' : undefined}
               >
@@ -105,41 +57,75 @@ const SidebarNav: React.FC<SidebarNavProps> = ({ currentPage, onNavigate }) => {
                   {isMexcSvg ? (
                     <Icon active={isActive} className={isActive ? 'icon-soft' : 'icon-muted'} size={20} />
                   ) : (
-                    <Icon size={18} strokeWidth={1.5} className={isActive ? 'text-accent' : 'text-textMuted'} />
+                    <Icon size={20} strokeWidth={isActive ? 2 : 1.5} className={isActive ? 'text-accent' : 'text-textMuted'} />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <span className="font-semibold text-sm tracking-tight truncate block">{item.label}</span>
+                  <span className={`text-[15px] tracking-tight truncate block ${isActive ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
                 </div>
               </button>
             );
           })}
         </nav>
 
-        {/* Bottom actions */}
-        <div className="flex flex-col gap-0.5 pt-2 border-t border-white/5">
+        {/* Bottom actions & User Profile */}
+        <div className="flex flex-col gap-1 pt-4">
           <button
             type="button"
             title={t('support')}
             onClick={() => { Haptic.medium(); onNavigate('SUPPORT'); }}
-            className="cursor-pointer flex items-center gap-3 px-4 py-3 rounded-xl text-left text-textSecondary hover:text-textPrimary hover:bg-surfaceElevated transition-all duration-200 active:scale-[0.98]"
+            className="cursor-pointer flex items-center gap-3 px-3 py-3 rounded-xl text-left text-textSecondary hover:text-textPrimary hover:bg-surface transition-all duration-200"
           >
-            <MessageCircle size={20} strokeWidth={1.5} />
-            <span className="font-medium text-sm tracking-tight">{t('support')}</span>
+            <div className="flex-shrink-0 flex items-center justify-center w-6 h-6">
+              <MessageCircle size={20} strokeWidth={1.5} />
+            </div>
+            <span className="font-medium text-[15px] tracking-tight">{t('support')}</span>
           </button>
-          {isWebUser && (
-            <button
-              type="button"
-              title={t('exit') || 'Выйти'}
-              onClick={() => {
-                Haptic.medium();
-                void logout();
-              }}
-            className="cursor-pointer flex items-center gap-3 px-4 py-3 rounded-xl text-left text-textSecondary hover:text-red-400 hover:bg-red-500/[0.06] transition-all duration-200 active:scale-[0.98]"
-            >
-              <LogOut size={20} strokeWidth={1.5} />
-              <span className="font-medium text-sm tracking-tight">{t('exit') || 'Выйти'}</span>
-            </button>
+          
+          <div className="h-px bg-border my-2 mx-2" />
+
+          {user ? (
+            <div className="flex items-center gap-3 px-2 py-2 mt-1">
+              <UserAvatar
+                name={displayName}
+                photoUrl={user.photo_url}
+                className="w-10 h-10 shrink-0"
+                imageClassName="border-border"
+                fallbackClassName="bg-surface text-textPrimary text-sm font-medium"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-textPrimary truncate">{displayName}</p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  {user.is_kyc ? (
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                      <ShieldCheck size={10} /> {t('verified') || 'Verified'}
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded">
+                      <ShieldAlert size={10} /> {t('verification_required') || 'Unverified'}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {isWebUser && (
+                <button
+                  type="button"
+                  title={t('exit') || 'Выйти'}
+                  onClick={() => {
+                    Haptic.medium();
+                    void logout();
+                  }}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-textMuted hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                >
+                  <LogOut size={16} strokeWidth={2} />
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="px-3 py-3 flex items-center gap-3 text-textMuted">
+              <User size={20} />
+              <span className="text-[15px] font-medium">{t('guest')}</span>
+            </div>
           )}
         </div>
       </div>

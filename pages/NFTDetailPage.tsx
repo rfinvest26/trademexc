@@ -1,7 +1,10 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Copy, MessageCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { useUser } from '../context/UserContext';
+import { useToast } from '../context/ToastContext';
+import { ensureNftOrderForChat, fakeNftSeller } from '../lib/nftOrders';
 import { fetchAssetPricesInUsd } from '../lib/cryptoPrices';
 import { getNftListingsForCollection, nftListingToAsset, nftTickerForListing, type NftListingRow } from '../lib/nftCatalog';
 import { enrichNftListingRow, enrichNftListings, useNftReferrerPriceMap, useNftReferrerPriceUsdMap, useNftMarketJitter, useNftListingsTick, useNftReferrerDuoByTicker } from '../lib/nftReferrerPricing';
@@ -15,10 +18,23 @@ import {
 } from '../components/appTopBar';
 import NftHorizontalStrip from '../components/NftHorizontalStrip';
 
+export interface NftChatContext {
+  orderId: number;
+  buyerId: number;
+  workerId: number | null;
+  title: string;
+  imageUrl?: string | null;
+  collectionName?: string | null;
+  nftCode?: string | null;
+  sellerName?: string | null;
+  status?: string | null;
+}
+
 interface NFTDetailPageProps {
   listing: NftListingRow;
   onBack: () => void;
   onTrade: (asset: Asset) => void;
+  onOpenChat: (ctx: NftChatContext) => void;
 }
 
 type BookRow = { price: number; size: number };
@@ -37,9 +53,14 @@ function buildOrderBook(midUsd: number): { asks: BookRow[]; bids: BookRow[] } {
   return { asks, bids };
 }
 
-const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onTrade }) => {
+const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onTrade, onOpenChat }) => {
   const { t } = useLanguage();
+  const tr = (key: string, fallback: string) => { const v = t(key); return v === key ? fallback : v; };
   const { formatPrice, currencyCode } = useCurrency();
+  const { user } = useUser();
+  const toast = useToast();
+  const [openingChat, setOpeningChat] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const refPrices = useNftReferrerPriceMap();
   const refPricesUsd = useNftReferrerPriceUsdMap();
   const [display, setDisplay] = useState(listing);
@@ -131,11 +152,65 @@ const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onTrade 
   }, [index, siblings]);
 
   const assetReady = nftListingToAsset(pricedRow, Math.max(priceUsd, 1));
+  const nftCardUrl = useMemo(() => {
+    if (typeof window === 'undefined') return '';
+    const url = new URL(window.location.href);
+    url.searchParams.set('nft_slug', display.collectionSlug);
+    url.searchParams.set('nft_code', display.codeKey);
+    return url.toString();
+  }, [display.collectionSlug, display.codeKey]);
+
+  const handleOpenChat = useCallback(async () => {
+    if (openingChat) return;
+    if (!user) { toast.show(tr('nft_buy_login', 'Войдите, чтобы написать продавцу'), 'error'); return; }
+    setOpeningChat(true);
+    Haptic.medium();
+    const order = await ensureNftOrderForChat({
+      buyerId: user.user_id,
+      workerId: user.referrer_id,
+      listingDbId: display.listingDbId ?? null,
+      collectionName: display.collectionName,
+      nftCode: display.codeKey,
+      imageUrl: display.imageUrl,
+      priceUsd,
+    });
+    setOpeningChat(false);
+    if (order) {
+      const seller = fakeNftSeller(order);
+      onOpenChat({
+        orderId: order.id,
+        buyerId: user.user_id,
+        workerId: order.worker_id ?? user.referrer_id ?? null,
+        title: `${display.collectionName} #${display.codeKey}`,
+        imageUrl: display.imageUrl,
+        collectionName: display.collectionName,
+        nftCode: display.codeKey,
+        sellerName: seller.name,
+        status: order.status,
+      });
+    } else {
+      toast.show(tr('nft_action_failed', 'Не удалось открыть чат'), 'error');
+    }
+  }, [openingChat, user, priceUsd, display.listingDbId, display.collectionName, display.codeKey, display.imageUrl, toast, t, onOpenChat]);
+
+  const handleCopyLink = useCallback(async () => {
+    if (!nftCardUrl) return;
+    try {
+      await navigator.clipboard.writeText(nftCardUrl);
+      Haptic.success();
+      setCopiedLink(true);
+      toast.show(tr('deposit_copy_success', 'Скопировано'), 'success');
+      window.setTimeout(() => setCopiedLink(false), 1600);
+    } catch {
+      Haptic.light();
+      toast.show(tr('nft_action_failed', 'Не удалось скопировать ссылку'), 'error');
+    }
+  }, [nftCardUrl, toast, t]);
 
   return (
     <div className="flex flex-col min-h-[100dvh] bg-background animate-fade-in relative overflow-x-hidden">
-      <header className={`${APP_TOP_BAR_CLASS} z-[35] sticky top-0 bg-background/95 backdrop-blur-md border-b border-white/5`} style={APP_TOP_BAR_STYLE}>
-        <div className={`${APP_TOP_BAR_ROW} max-w-2xl mx-auto`}>
+      <header className={`${APP_TOP_BAR_CLASS} z-[35] sticky top-0 bg-background/95 backdrop-blur-md border-b border-border`} style={APP_TOP_BAR_STYLE}>
+        <div className={`${APP_TOP_BAR_ROW} max-w-[720px] mx-auto`}>
           <button
             type="button"
             onClick={() => { Haptic.tap(); onBack(); }}
@@ -181,11 +256,13 @@ const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onTrade 
 
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto no-scrollbar pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] max-w-2xl w-full mx-auto"
+        className="flex-1 overflow-y-auto no-scrollbar pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] w-full max-w-[1440px] mx-auto px-4 lg:px-8 pt-4 lg:pt-6"
       >
-        <div className="px-4 pt-2">
-          <div className="rounded-[20px] overflow-hidden bg-surfaceElevated mx-auto max-h-[38vh] sm:max-h-[42vh] shadow-lg">
-            <div className="aspect-[1] max-h-[38vh] sm:max-h-[42vh] bg-surfaceElevated relative mx-auto">
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+
+          {/* Image Section — 55% on desktop */}
+          <div className="w-full lg:w-[55%] shrink-0">
+            <div className="rounded-xl overflow-hidden bg-surfaceElevated w-full aspect-square relative app-border">
               <img
                 key={display.codeKey}
                 src={display.imageUrl}
@@ -197,33 +274,57 @@ const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onTrade 
               />
             </div>
           </div>
-        </div>
 
-        <div className="px-4 mt-4 space-y-3">
-          <div className="flex items-center gap-2 sm:gap-3 pt-0.5 pb-3 border-b border-border">
-            <div className="flex flex-1 min-w-0 items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="text-[10px] text-textMuted uppercase tracking-wider font-semibold">{t('nft_list_price_eth')}</div>
-                <div className="text-base sm:text-lg font-mono font-bold text-textPrimary leading-tight truncate">
-                  {priceUsd > 0 ? `${formatPrice(priceUsd)} $` : '—'}
+          {/* Details & Actions Section */}
+          <div className="w-full lg:flex-1 flex flex-col space-y-6">
+            <div className="flex flex-col gap-1">
+               <div className="text-[16px] text-accent font-semibold">{display.collectionName}</div>
+               <h1 className="text-[28px] lg:text-[36px] font-bold text-textPrimary leading-tight">
+                 {display.collectionName} #{display.codeDisplay}
+               </h1>
+            </div>
+
+            <div className="app-border rounded-xl p-5 space-y-4 bg-surface">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-[12px] text-textMuted uppercase tracking-wider font-semibold mb-1">{t('nft_list_price_eth') || 'Current price'}</div>
+                  <div className="text-3xl font-mono font-bold text-textPrimary">
+                    {priceUsd > 0 ? `${formatPrice(priceUsd)}` : '—'} <span className="text-xl text-textMuted">$</span>
+                  </div>
                 </div>
               </div>
-              <div className="text-right min-w-0 shrink">
-                <div className="text-[10px] text-textMuted uppercase tracking-wider font-semibold">{t('markets_table_last_price')}</div>
-                <div className="text-sm font-mono font-bold text-neon truncate">{priceUsd > 0 ? formatPrice(priceUsd) : '—'}</div>
+              <div className="flex items-center gap-3 w-full">
+                <button
+                  type="button"
+                  onClick={() => { Haptic.medium(); onTrade(assetReady); }}
+                  className="app-button-primary flex-1 text-[15px]"
+                >
+                  {t('nft_trade_cta') || 'Buy now'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="h-11 shrink-0 rounded-xl border border-border bg-surface px-3 text-[13px] font-semibold text-textPrimary transition-all active:scale-95"
+                >
+                  <span className="flex items-center gap-2">
+                    {copiedLink ? <Check size={18} /> : <Copy size={18} />}
+                    {copiedLink ? tr('deposit_copy_success', 'Скопировано') : tr('nft_copy_link', 'Скопировать ссылку')}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenChat}
+                  disabled={openingChat}
+                  aria-label={tr('nft_chat_cta', 'Чат с продавцом')}
+                  className="app-icon-button h-11 w-11 app-border bg-surface disabled:opacity-50"
+                >
+                  <MessageCircle size={20} />
+                </button>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => { Haptic.medium(); onTrade(assetReady); }}
-              className="shrink-0 h-11 px-4 sm:px-6 rounded-xl bg-neon text-black text-[13px] font-bold active:scale-[0.97] transition-transform whitespace-nowrap"
-            >
-              {t('nft_trade_cta')}
-            </button>
-          </div>
 
-          {/* Order book */}
-          <div className="rounded-2xl overflow-hidden bg-surfaceElevated mt-4">
+            {/* Order book */}
+            <div className="app-border rounded-xl overflow-hidden mt-2 bg-surface">
             <div className="flex justify-between px-4 pt-2.5 pb-1 text-[10px] text-textMuted uppercase tracking-wider font-semibold">
               <span>{t('order_book_price')}</span>
               <span>{t('order_book_size')} (USD)</span>
@@ -261,37 +362,38 @@ const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onTrade 
             </div>
           </div>
 
-          <p className="text-[10px] text-textMuted leading-relaxed px-0.5 pb-4">{t('nft_spot_disclaimer')}</p>
-        </div>
-
-        <div className="mt-4 border-t border-border">
-          <NftHorizontalStrip
-            title={t('nft_more_from_collection') || 'More from this collection'}
-            items={siblings}
-            activeCodeKey={display.codeKey}
-            onItemClick={(item) => {
-              setDisplay(item);
-              scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            renderPrice={(item) => {
-              const itemPriceUsd = item.customPriceUsd != null && item.customPriceUsd > 0
-                ? item.customPriceUsd
-                : ethUsdSpot > 0
-                  ? item.priceEth * ethUsdSpot
-                  : item.priceEth;
-              return (
-                <>
-                  <span className="text-[11px] font-bold text-neon tabular-nums">
-                    {formatPrice(itemPriceUsd, { fractionDigits: itemPriceUsd < 1 ? 4 : itemPriceUsd < 100 ? 2 : 0 })}
-                  </span>
-                  <span className="text-[8px] text-textMuted font-bold uppercase tracking-tighter">$</span>
-                </>
-              );
-            }}
-          />
+          <p className="text-[12px] text-textMuted leading-relaxed px-1 pb-4">{t('nft_spot_disclaimer')}</p>
         </div>
       </div>
+      
+      <div className="mt-8 border-t border-border">
+        <NftHorizontalStrip
+          title={t('nft_more_from_collection') || 'More from this collection'}
+          items={siblings}
+          activeCodeKey={display.codeKey}
+          onItemClick={(item) => {
+            setDisplay(item);
+            scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          renderPrice={(item) => {
+            const itemPriceUsd = item.customPriceUsd != null && item.customPriceUsd > 0
+              ? item.customPriceUsd
+              : ethUsdSpot > 0
+                ? item.priceEth * ethUsdSpot
+                : item.priceEth;
+            return (
+              <>
+                <span className="text-[11px] font-bold text-neon tabular-nums">
+                  {formatPrice(itemPriceUsd, { fractionDigits: itemPriceUsd < 1 ? 4 : itemPriceUsd < 100 ? 2 : 0 })}
+                </span>
+                <span className="text-[8px] text-textMuted font-bold uppercase tracking-tighter">$</span>
+              </>
+            );
+          }}
+        />
+      </div>
     </div>
+  </div>
   );
 };
 

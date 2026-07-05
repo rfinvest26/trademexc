@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   RefreshCw,
   MoreHorizontal,
+  ArrowLeft,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import { useUser } from '../context/UserContext';
@@ -31,9 +32,11 @@ import { logAction } from '../lib/appLog';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
 import { Haptic } from '../utils/haptics';
+import AppTextarea from '../components/AppTextarea';
 
 interface SupportPageProps {
   onBack: () => void;
+  mode?: 'page' | 'drawer';
 }
 
 type SupportMessage = SupportMessageRecord;
@@ -115,7 +118,7 @@ const AttachmentCard: React.FC<{ url: string }> = ({ url }) => {
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-2 block rounded-xl overflow-hidden border border-border bg-card"
+        className="mt-2 block rounded-xl overflow-hidden app-border bg-card"
       >
         <video src={url} controls playsInline className="w-full max-h-64 object-contain bg-surface" />
         <div className="px-3 py-2 hairline-top text-[11px] font-mono text-textMuted truncate">{name}</div>
@@ -128,9 +131,9 @@ const AttachmentCard: React.FC<{ url: string }> = ({ url }) => {
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-2 flex items-center gap-3 rounded-xl border border-border bg-surface/60 px-3 py-2.5 hover:border-border/60 transition-colors"
+        className="mt-2 flex items-center gap-3 rounded-xl app-border bg-surface/60 px-3 py-2.5 hover:border-border/60 transition-colors"
       >
-        <div className="h-10 w-10 rounded-xl bg-card/60 border border-border flex items-center justify-center text-textMuted font-bold text-xs">
+        <div className="h-10 w-10 rounded-xl bg-card/60 app-border flex items-center justify-center text-textMuted font-bold text-xs">
           PDF
         </div>
         <div className="min-w-0 flex-1">
@@ -146,7 +149,7 @@ const AttachmentCard: React.FC<{ url: string }> = ({ url }) => {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="mt-2 block rounded-xl overflow-hidden border border-border bg-card"
+      className="mt-2 block rounded-xl overflow-hidden app-border bg-card"
     >
       <img src={url} alt="" className="max-h-64 w-full object-contain" loading="lazy" />
     </a>
@@ -162,7 +165,7 @@ const QUICK_TOPICS: { id: string; labelKey: string; Icon: LucideIcon }[] = [
   { id: 'other', labelKey: 'support_topic_other', Icon: MoreHorizontal },
 ];
 
-const SupportPage: React.FC<SupportPageProps> = ({ onBack }) => {
+const SupportPage: React.FC<SupportPageProps> = ({ onBack, mode = 'page' }) => {
   const { user } = useUser();
   const { t } = useLanguage();
   const toast = useToast();
@@ -436,10 +439,10 @@ const SupportPage: React.FC<SupportPageProps> = ({ onBack }) => {
 
   if (!user) {
     return (
-      <div className="flex flex-col h-full min-h-0 bg-background animate-fade-in max-w-2xl lg:max-w-4xl mx-auto">
+      <div className="flex flex-col h-full min-h-0 bg-background animate-fade-in max-w-[720px] lg:max-w-4xl mx-auto">
         <PageHeader title={t('support_chat_title')} onBack={onBack} />
         <div className="flex-1 flex flex-col px-4 py-6 overflow-y-auto">
-          <div className="rounded-xl bg-card overflow-hidden border border-border">
+          <div className="rounded-xl bg-card overflow-hidden app-border">
             <div className="px-4 py-3 bg-surface/60 hairline-bottom">
               <p className="text-xs font-semibold text-textSecondary tracking-tight">
                 {t('support_chat_title')}
@@ -447,7 +450,7 @@ const SupportPage: React.FC<SupportPageProps> = ({ onBack }) => {
             </div>
             <div className="p-5 space-y-5">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-card border border-border flex items-center justify-center text-neon shrink-0">
+                <div className="h-10 w-10 rounded-xl bg-card app-border flex items-center justify-center text-neon shrink-0">
                   <Headphones size={20} strokeWidth={2} />
                 </div>
                 <div className="min-w-0">
@@ -460,7 +463,7 @@ const SupportPage: React.FC<SupportPageProps> = ({ onBack }) => {
               <button
                 type="button"
                 onClick={onBack}
-                className="w-full touch-target min-h-[52px] py-3.5 rounded-2xl bg-neon text-black font-semibold text-base active:scale-[0.99] transition-transform hover:opacity-95"
+                className="w-full touch-target min-h-[52px] py-3.5 rounded-xl bg-neon text-black font-semibold text-base active:scale-[0.99] transition-transform hover:opacity-95"
               >
                 Назад
               </button>
@@ -471,14 +474,57 @@ const SupportPage: React.FC<SupportPageProps> = ({ onBack }) => {
     );
   }
 
-  return (
-    <div className="flex flex-col h-full min-h-0 bg-background animate-fade-in max-w-md mx-auto">
-      <PageHeader title={t('support_chat_title')} onBack={onBack} />
+  const isDrawer = mode === 'drawer';
 
-      <div className="flex-1 flex flex-col min-h-0">
+  return (
+    <div className={`flex flex-col h-full min-h-0 bg-background animate-fade-in ${
+      isDrawer ? '' : 'md:grid md:grid-cols-[280px_1fr] md:max-w-5xl md:mx-auto md:border-x md:border-border'
+    }`}>
+      {/* Desktop Sidebar */}
+      <div className={`${isDrawer ? 'hidden' : 'hidden md:flex'} flex-col border-r border-border bg-surface/30`}>
+        <div className="p-4 hairline-bottom">
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={onBack} className="p-1.5 -ml-1.5 text-textSubtle hover:text-textPrimary rounded-lg hover:bg-white/5 transition-colors">
+              <ArrowLeft size={20} />
+            </button>
+            <span className="text-[17px] font-semibold text-textPrimary tracking-tight">
+              {t('support_chat_title')}
+            </span>
+          </div>
+        </div>
+        <div className="p-4 space-y-2 flex-1 overflow-y-auto">
+          <h3 className="text-[10px] font-semibold text-textSecondary uppercase tracking-wider mb-3">
+            {t('support_chat_quick_topics')}
+          </h3>
+          <div className="space-y-1.5">
+            {QUICK_TOPICS.map(({ id, labelKey, Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => handleQuick(labelKey)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-surfaceElevated active:scale-[0.99] transition-all"
+              >
+                <div className="h-8 w-8 rounded-lg bg-surface app-border flex items-center justify-center shrink-0">
+                  <Icon size={14} className="text-neon" strokeWidth={2} />
+                </div>
+                <span className="text-xs font-medium text-textPrimary truncate">
+                  {t(labelKey)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col min-h-0 relative bg-background">
+        <div className={`${isDrawer ? 'shrink-0' : 'md:hidden shrink-0'}`}>
+          <PageHeader title={t('support_chat_title')} onBack={onBack} />
+        </div>
+
         <header className="shrink-0 px-4 py-2.5 hairline-bottom bg-background">
           <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-full bg-surface flex items-center justify-center text-neon shrink-0 border border-border">
+            <div className="h-8 w-8 rounded-full bg-surface flex items-center justify-center text-neon shrink-0 app-border">
               <Headphones size={15} strokeWidth={2.2} />
             </div>
             <div className="min-w-0 flex-1">
@@ -510,7 +556,7 @@ const SupportPage: React.FC<SupportPageProps> = ({ onBack }) => {
 
           {!loading && messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-center px-2">
-              <div className="h-14 w-14 rounded-xl bg-card border border-border flex items-center justify-center mb-3">
+              <div className="h-14 w-14 rounded-xl bg-card app-border flex items-center justify-center mb-3">
                 <Inbox size={26} className="text-textMuted" strokeWidth={1.75} />
               </div>
               <p className="text-sm font-medium text-textPrimary">
@@ -542,25 +588,17 @@ const SupportPage: React.FC<SupportPageProps> = ({ onBack }) => {
             return (
               <div key={m.id} className={`flex w-full mb-1 ${isUser ? 'justify-end' : 'justify-start'}`}>
                 <div
-                  className={`max-w-[85%] px-3.5 pt-2.5 pb-5 text-[13px] leading-relaxed relative ${
+                  className={`app-message ${
                     isUser
-                      ? 'bg-neon text-black rounded-2xl rounded-tr-none shadow-sm border-none font-medium'
-                      : 'bg-card text-textPrimary rounded-2xl rounded-tl-none border border-border shadow-sm'
+                      ? 'app-message-user font-medium'
+                      : 'app-message-peer'
                   }`}
                 >
                   <p className="whitespace-pre-wrap break-words">{m.text}</p>
                   {m.image_url ? <AttachmentCard url={m.image_url} /> : null}
-                  
-                  {/* Inline bottom-right meta badge */}
-                  <div className="absolute bottom-1 right-2.5 flex items-center gap-0.5 select-none pointer-events-none">
-                    <span className={`text-[8.5px] font-mono font-medium ${isUser ? 'text-black/60' : 'text-textMuted'}`}>
-                      {timeStr}
-                    </span>
-                    {isUser && (
-                      <span className="text-[10px] text-black/60 font-semibold leading-none -mt-0.5" aria-hidden>
-                        ✓✓
-                      </span>
-                    )}
+                  <div className={`app-message-meta ${isUser ? 'app-message-meta-user' : 'app-message-meta-peer'}`}>
+                    <span>{timeStr}</span>
+                    {isUser && <span className="app-message-checks" aria-hidden>✓✓</span>}
                   </div>
                 </div>
               </div>
@@ -570,7 +608,7 @@ const SupportPage: React.FC<SupportPageProps> = ({ onBack }) => {
 
         <div className="shrink-0 px-4 pt-2 pb-2 pb-safe hairline-top bg-background space-y-2">
           {showQuickHelp && (
-            <div className="flex items-center justify-between gap-2">
+            <div className={`items-center justify-between gap-2 ${isDrawer ? 'flex' : 'flex md:hidden'}`}>
               <span className="text-xs font-medium text-textSecondary tracking-tight">
                 {t('support_chat_quick_topics')}
               </span>
@@ -585,13 +623,13 @@ const SupportPage: React.FC<SupportPageProps> = ({ onBack }) => {
             </div>
           )}
           {showQuickHelp && (
-            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-0.5 -mx-1 px-1">
+            <div className={`${isDrawer ? 'flex' : 'md:hidden flex'} gap-2 overflow-x-auto no-scrollbar pb-0.5 -mx-1 px-1`}>
               {QUICK_TOPICS.map(({ id, labelKey, Icon }) => (
                 <button
                   key={id}
                   type="button"
                   onClick={() => handleQuick(labelKey)}
-                  className="touch-target flex items-center gap-2 px-3 py-2 rounded-xl bg-surface border border-border text-left hover:border-border/60 active:scale-[0.99] transition-all flex-shrink-0 min-h-[44px]"
+                  className="touch-target flex items-center gap-2 px-3 py-2 rounded-xl bg-surface app-border text-left hover:border-border/60 active:scale-[0.99] transition-all flex-shrink-0 min-h-[44px]"
                 >
                   <Icon size={16} className="text-neon shrink-0" strokeWidth={2} />
                   <span className="text-xs font-medium text-textSecondary whitespace-nowrap max-w-[200px] truncate">
@@ -612,12 +650,12 @@ const SupportPage: React.FC<SupportPageProps> = ({ onBack }) => {
             </button>
           )}
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4,video/webm,video/quicktime"
-            className="hidden"
-            onChange={(e) => {
+          {React.createElement('input', {
+            ref: fileInputRef,
+            type: 'file',
+            accept: 'image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4,video/webm,video/quicktime',
+            className: 'hidden',
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
               const file = e.target.files?.[0];
               e.target.value = '';
               if (!file) return;
@@ -628,25 +666,25 @@ const SupportPage: React.FC<SupportPageProps> = ({ onBack }) => {
               }
               Haptic.tap();
               setPendingImage(file);
-            }}
-          />
+            },
+          })}
 
           {pendingImage && (
-            <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-2.5 py-2">
+            <div className="flex items-center gap-2 rounded-xl app-border bg-surface px-2.5 py-2">
               {pendingImage.type.startsWith('image/') && previewUrl ? (
                 <img
                   src={previewUrl}
                   alt=""
-                  className="h-12 w-12 rounded-lg object-cover shrink-0 border border-border"
+                  className="h-12 w-12 rounded-lg object-cover shrink-0 app-border"
                 />
               ) : pendingImage.type.startsWith('video/') && previewUrl ? (
                 <video
                   src={previewUrl}
-                  className="h-12 w-12 rounded-lg object-cover shrink-0 border border-border"
+                  className="h-12 w-12 rounded-lg object-cover shrink-0 app-border"
                   muted
                 />
               ) : (
-                <div className="h-12 w-12 rounded-lg bg-card/60 border border-border flex items-center justify-center shrink-0 text-textMuted text-xs font-bold">
+                <div className="h-12 w-12 rounded-lg bg-card/60 app-border flex items-center justify-center shrink-0 text-textMuted text-xs font-bold">
                   {pendingImage.type === 'application/pdf' ? 'PDF' : 'FILE'}
                 </div>
               )}
@@ -660,7 +698,7 @@ const SupportPage: React.FC<SupportPageProps> = ({ onBack }) => {
                   Haptic.tap();
                   setPendingImage(null);
                 }}
-                className="touch-target p-2 rounded-lg border border-border text-textMuted hover:text-textPrimary shrink-0"
+                className="touch-target p-2 rounded-lg app-border text-textMuted hover:text-textPrimary shrink-0"
                 aria-label={t('support_chat_remove_file')}
               >
                 <X size={18} />
@@ -676,13 +714,13 @@ const SupportPage: React.FC<SupportPageProps> = ({ onBack }) => {
                 fileInputRef.current?.click();
               }}
               disabled={!threadId || sending}
-              className="touch-target h-10 w-10 rounded-xl border border-border/80 bg-card flex items-center justify-center text-textMuted hover:text-neon hover:border-border/60 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] transition-all shrink-0"
+              className="touch-target h-10 w-10 rounded-xl app-border-soft bg-card flex items-center justify-center text-textMuted hover:text-neon hover:border-border/60 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] transition-all shrink-0"
               title={t('support_chat_attach')}
               aria-label={t('support_chat_attach')}
             >
               <ImagePlus size={18} strokeWidth={2} />
             </button>
-            <textarea
+            <AppTextarea
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -703,7 +741,7 @@ const SupportPage: React.FC<SupportPageProps> = ({ onBack }) => {
               placeholder={t('support_chat_placeholder')}
               aria-label={t('support_chat_input_aria')}
               disabled={!threadId}
-              className="flex-1 resize-none bg-card border border-border/80 rounded-xl px-3 py-2 text-sm text-textPrimary placeholder:text-textMuted outline-none focus-visible:ring-2 focus-visible:ring-border focus-visible:border-textMuted min-h-[40px] max-h-[96px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] leading-snug"
+              className="flex-1 resize-none min-h-[40px] max-h-[96px] hide-scrollbar leading-snug"
             />
             <button
               type="button"

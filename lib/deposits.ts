@@ -50,7 +50,8 @@ export async function openP2PDeal(input: CreateP2PDealInput): Promise<OpenP2PDea
     p_seller_name: sellerName,
   });
 
-  if (error || !data || typeof data !== 'object') return null;
+  if (error) throw error;
+  if (!data || typeof data !== 'object') return null;
 
   const response = data as {
     ok?: boolean;
@@ -63,7 +64,7 @@ export async function openP2PDeal(input: CreateP2PDealInput): Promise<OpenP2PDea
     time_seconds?: number | null;
   };
 
-  if (response.ok === false || response.error) return null;
+  if (response.ok === false || response.error) throw new Error(response.error || 'OPEN_P2P_DEAL_FAILED');
 
   if (!response.deal_id) return null;
 
@@ -139,8 +140,10 @@ export async function createCryptoDepositRequest(input: {
     p_amount_usd: input.amountUsd,
     p_currency: input.currency,
   });
-  if (error || !data || typeof data !== 'object') return null;
-  const response = data as { id?: number; created_at?: string | null };
+  if (error) throw error;
+  if (!data || typeof data !== 'object') return null;
+  const response = data as { ok?: boolean; error?: string; id?: number; created_at?: string | null };
+  if (response.ok === false || response.error) throw new Error(response.error || 'CREATE_DEPOSIT_FAILED');
   if (!Number.isFinite(Number(response.id))) return null;
   return { id: Number(response.id), created_at: response.created_at ?? null };
 }

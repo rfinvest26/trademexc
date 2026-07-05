@@ -8,6 +8,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     // Nav
     nav_home: 'Home',
     nav_coins: 'Markets',
+    nav_nft: 'NFT',
     nav_trading: 'Trading',
     nav_deals: 'Portfolio',
     nav_exchange: 'Exchange',

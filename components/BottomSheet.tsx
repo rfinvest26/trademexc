@@ -125,15 +125,15 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
   const panelBase =
     variant === 'fullscreen'
       ? 'w-full bg-background animate-sheet-up overflow-hidden flex flex-col'
-      : 'w-full max-w-md bg-background rounded-t-3xl shadow-2xl ring-1 ring-white/5 animate-sheet-up overflow-hidden flex flex-col';
+      : 'w-full max-w-md lg:max-w-xl bg-background rounded-t-[14px] lg:rounded-xl lg:border lg:border-border shadow-elevation-2 animate-sheet-up lg:animate-modal-in overflow-hidden flex flex-col';
 
-  const overlayAlign = variant === 'fullscreen' ? 'items-stretch' : 'items-end';
+  const overlayAlign = variant === 'fullscreen' ? 'items-stretch' : 'items-end lg:items-center';
 
   const effectiveShowHandle = showHandle ?? variant !== 'fullscreen';
 
   const overlayRoot = (
     <div
-      className={`fixed inset-0 flex ${overlayAlign} justify-center animate-fade-in transition-opacity duration-200 ${fullscreenBackdropClass}`}
+      className={`fixed left-0 right-0 top-0 bottom-0 flex ${overlayAlign} justify-center animate-fade-in transition-opacity duration-200 ${fullscreenBackdropClass}`}
       style={{
         zIndex: variant === 'fullscreen' ? Z_INDEX.fullscreen : Z_INDEX.picker,
         paddingBottom: variant === 'fullscreen' ? undefined : 'env(safe-area-inset-bottom)',

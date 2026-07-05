@@ -63,5 +63,5 @@ export const MARKET_ASSETS: Asset[] = [
 /** US-акции: удалены по запросу, это чистая криптобиржа */
 export const STOCK_MARKET_ASSETS: Asset[] = [];
 
-/** Локальный логотип из `public/mexc-logo.png` — без внешних CDN */
-export const ETORO_LOGO_URL = `${import.meta.env.BASE_URL}mexc-logo.png`;
+/** Локальный логотип из `public/app-logo.png` — без внешних CDN */
+export const ETORO_LOGO_URL = `${import.meta.env.BASE_URL}app-logo.png`;

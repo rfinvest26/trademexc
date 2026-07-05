@@ -23,8 +23,8 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   alt = '',
 }) => {
   const initial = (name || '').trim().charAt(0).toUpperCase() || '?';
-  const imageClasses = `${className} rounded-full object-cover bg-white/5 ring-1 ring-white/10 shrink-0 ${imageClassName}`.trim();
-  const fallbackClasses = `${className} rounded-full bg-white/5 ring-1 ring-white/10 shrink-0 flex items-center justify-center font-semibold text-textPrimary ${fallbackClassName}`.trim();
+  const imageClasses = `${className} rounded-full object-cover bg-white/5 ring-1 ring-border shrink-0 ${imageClassName}`.trim();
+  const fallbackClasses = `${className} rounded-full bg-white/5 ring-1 ring-border shrink-0 flex items-center justify-center font-semibold text-textPrimary ${fallbackClassName}`.trim();
 
   if (photoUrl) {
     return <img src={photoUrl} alt={alt} referrerPolicy="no-referrer" className={imageClasses} />;

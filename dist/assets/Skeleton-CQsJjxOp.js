@@ -1,0 +1,1 @@
+import{j as r,b as a}from"./vendor-DIVAN2SE.js";const o=({className:e="",rounded:s=!0,shimmer:t=!0})=>r.jsx("div",{className:a(t?"skeleton-shimmer":"animate-pulse bg-neutral-800/80",s?"rounded-lg":"",e)});export{o as S};
