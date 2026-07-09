@@ -11,7 +11,8 @@ import {
   getMyNftOwned,
   getListedUserNfts,
   buyListedUserNft,
-  listOwnedNftForSale,
+  sellOwnedNftMarket,
+  createOwnedNftSellOrder,
   unlistOwnedNft,
   getMyNftOrders,
   fakeNftSeller,
@@ -183,7 +184,7 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
   // rawT возвращает сам ключ при отсутствии перевода; для паттерна `t('k') || 'fallback'`
   // нам нужен falsy-результат, поэтому маппим отсутствующий перевод в пустую строку.
   const t = (key: string) => { const v = rawT(key); return v === key ? '' : v; };
-  const { user, settings } = useUser();
+  const { user, settings, refreshUser } = useUser();
   const toast = useToast();
   const refPrices = useNftReferrerPriceMap();
 
@@ -369,14 +370,54 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
   const [sellTicket, setSellTicket] = useState<NftOwnedRow | null>(null);
   const [listing, setListing] = useState(false);
 
-  const handleListSubmit = async (price: number) => {
-    if (!sellTicket || listing) return;
+  const ownedSellErrorText = (code?: string): string => {
+    switch (code) {
+      case 'TRADING_BLOCKED':
+        return t('trading_blocked_toast') || 'Торговля заблокирована';
+      case 'WORKER_NOT_FOUND':
+        return t('nft_sell_no_worker') || 'Продажа недоступна: не назначен воркер';
+      case 'NFT_NOT_AVAILABLE':
+        return t('nft_sell_unavailable') || 'NFT уже продан или недоступен';
+      case 'INVALID_PRICE':
+        return t('order_price_invalid') || 'Некорректная цена';
+      default:
+        return t('nft_action_failed') || 'Не удалось';
+    }
+  };
+
+  // «Мои NFT» → продажа: рыночная (мгновенно) или ордерная (заявка + SMS воркеру).
+  const handleOwnedSellSubmit = async (price: number, kind: 'market' | 'order' = 'market') => {
+    if (!sellTicket || listing || !user?.user_id) return;
     setListing(true);
-    const ok = await listOwnedNftForSale(sellTicket.id, price);
-    setListing(false);
-    setSellTicket(null);
-    if (ok) { toast.show(t('nft_listed_ok') || 'Выставлено на продажу', 'success'); void reloadOwned(); }
-    else toast.show(t('nft_action_failed') || 'Не удалось', 'error');
+    try {
+      if (kind === 'market') {
+        const res = await sellOwnedNftMarket(user.user_id, sellTicket.id, price);
+        if (res.ok) {
+          Haptic.success();
+          toast.show(`${t('nft_sold_ok') || 'Продано'} · +$${(res.amountUsd ?? 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`, 'success');
+          setSellTicket(null);
+          void reloadOwned();
+          void refreshUser();
+        } else {
+          toast.show(ownedSellErrorText(res.error), 'error');
+        }
+      } else {
+        const order = await createOwnedNftSellOrder(user.user_id, sellTicket.id, price);
+        if (order) {
+          Haptic.success();
+          toast.show(t('nft_sell_order_sent') || 'Заявка на продажу отправлена. Ожидайте подтверждения.', 'success');
+          setSellTicket(null);
+          void reloadOwned();
+        } else {
+          toast.show(ownedSellErrorText(), 'error');
+        }
+      }
+    } catch (err) {
+      const code = err instanceof Error ? err.message : '';
+      toast.show(ownedSellErrorText(code), 'error');
+    } finally {
+      setListing(false);
+    }
   };
 
   const handleUnlist = async (row: NftOwnedRow) => {
@@ -955,11 +996,12 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
       {sellTicket && (
         <NftOrderTicket
           mode="sell"
+          sellKinds
           nftLabel={`${sellTicket.collection_name ?? 'NFT'}${sellTicket.nft_code ? ` #${sellTicket.nft_code}` : ''}`}
           imageUrl={sellTicket.image_url}
-          defaultPriceUsd={Number(sellTicket.acquired_price_usd ?? 0)}
+          defaultPriceUsd={Number(sellTicket.list_price_usd ?? sellTicket.acquired_price_usd ?? 0)}
           submitting={listing}
-          onSubmit={handleListSubmit}
+          onSubmit={handleOwnedSellSubmit}
           onClose={() => setSellTicket(null)}
         />
       )}

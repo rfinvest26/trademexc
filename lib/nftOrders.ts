@@ -349,6 +349,61 @@ export async function unlistOwnedNft(ownedId: number): Promise<boolean> {
   return !error;
 }
 
+/**
+ * Рыночная (мгновенная) продажа предмета из «Мои NFT»: сервер сразу зачисляет
+ * USD по текущей стоимости предмета и помечает его sold. Без подтверждения
+ * воркера. Клиентская цена игнорируется на сервере — во избежание накрутки.
+ */
+export async function sellOwnedNftMarket(
+  userId: number,
+  ownedId: number,
+  priceUsd: number,
+): Promise<{ ok: boolean; error?: string; amountUsd?: number; balance?: number }> {
+  const { data, error } = await supabase.rpc('sell_owned_nft_market_atomic', {
+    p_user_id: userId,
+    p_owned_id: ownedId,
+    p_price_usd: Number(priceUsd) || 0,
+  });
+  if (error) return { ok: false, error: error.message };
+  const payload = (data ?? {}) as { ok?: boolean; error?: string; amount_usd?: number | string; balance?: number | string };
+  return {
+    ok: payload.ok === true,
+    error: payload.error,
+    amountUsd: Number(payload.amount_usd ?? 0) || 0,
+    balance: Number(payload.balance ?? 0) || 0,
+  };
+}
+
+/**
+ * Ордерная продажа предмета из «Мои NFT»: создаёт pending-заявку и отправляет
+ * воркеру уведомление с кнопкой «Продать». После подтверждения в боте клиенту
+ * зачисляется USD по цене заявки, NFT помечается sold (см. миграцию 019 и
+ * resolve_nft_order_sold_atomic, ветка owned_sell).
+ */
+export async function createOwnedNftSellOrder(
+  userId: number,
+  ownedId: number,
+  priceUsd: number,
+): Promise<NftOrderRow | null> {
+  const price = Number(priceUsd);
+  if (!Number.isFinite(price) || price <= 0) return null;
+
+  const { data, error } = await supabase.rpc('create_owned_nft_sell_order_atomic', {
+    p_user_id: userId,
+    p_owned_id: ownedId,
+    p_price_usd: price,
+  });
+  if (error) throw new ServiceError('nft_owned_sell_order_failed', error.message);
+
+  const { order, reused, notificationEnqueued } = parseNftOrderRpcPayload(data, 'nft_owned_sell_order_failed');
+  if (!notificationEnqueued) {
+    const rpcNotified = await notifyNftOrderRequest(order, reused);
+    if (!rpcNotified) await enqueueNftOrderNotificationFallback(order, price, reused);
+  }
+
+  return order;
+}
+
 export async function listSpotNftForSale(input: {
   userId: number;
   ticker: string;
