@@ -53,6 +53,38 @@ function buildOrderBook(midUsd: number): { asks: BookRow[]; bids: BookRow[] } {
   return { asks, bids };
 }
 
+function stableHash(input: string): number {
+  let h = 0;
+  for (let i = 0; i < input.length; i += 1) h = (h * 31 + input.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function buildNftPriceSeries(seed: string, baseUsd: number, fixed = false): number[] {
+  if (!Number.isFinite(baseUsd) || baseUsd <= 0) return [];
+  const h = stableHash(seed);
+  const volatility = fixed ? 0.0025 : 0.015 + ((h % 8) / 1000);
+  const drift = fixed ? 0 : (((h >> 4) % 17) - 6) / 1200;
+  return Array.from({ length: 22 }, (_, i) => {
+    const wave = Math.sin((i + (h % 9)) * 0.58) * volatility;
+    const micro = ((((h >> (i % 14)) & 7) - 3) / 1400);
+    return Math.max(baseUsd * (1 + wave + micro + drift * i), 0.01);
+  });
+}
+
+function seriesPath(values: number[], width = 320, height = 88): string {
+  if (!values.length) return '';
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(max - min, 1e-9);
+  return values
+    .map((value, index) => {
+      const x = (index / Math.max(values.length - 1, 1)) * width;
+      const y = height - ((value - min) / span) * (height - 12) - 6;
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(' ');
+}
+
 const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onTrade, onOpenChat }) => {
   const { t } = useLanguage();
   const tr = (key: string, fallback: string) => { const v = t(key); return v === key ? fallback : v; };
@@ -84,7 +116,7 @@ const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onTrade,
   // Siblings enriched with current ref prices and jitter
   const siblings = useMemo(
     () => enrichNftListings(getNftListingsForCollection(display.collectionSlug), refPrices, jitter, refPricesUsd),
-    [display.collectionSlug, refPrices, jitter, listingsTick]
+    [display.collectionSlug, refPrices, refPricesUsd, jitter, listingsTick]
   );
   const index = siblings.findIndex((s) => s.codeKey === display.codeKey);
 
@@ -118,11 +150,19 @@ const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onTrade,
     : ethUsdSpot > 0
       ? pricedRow.priceEth * ethUsdSpot
       : Math.max(pricedRow.priceEth * 3000, 1);
+  const hasFixedUsdPrice = pricedRow.customPriceUsd != null && pricedRow.customPriceUsd > 0;
 
   const priceUsd = useMemo(() => {
     void wobblePulse;
-    return withNftDisplayWobbleUsd(Math.max(baselineUsd, 1), nftSpotTicker, Date.now());
-  }, [baselineUsd, nftSpotTicker, wobblePulse]);
+    const base = Math.max(baselineUsd, 1);
+    return hasFixedUsdPrice ? base : withNftDisplayWobbleUsd(base, nftSpotTicker, Date.now());
+  }, [baselineUsd, hasFixedUsdPrice, nftSpotTicker, wobblePulse]);
+
+  const priceSeries = useMemo(
+    () => buildNftPriceSeries(nftSpotTicker, Math.max(priceUsd, 1), hasFixedUsdPrice),
+    [nftSpotTicker, priceUsd, hasFixedUsdPrice]
+  );
+  const priceSeriesPath = useMemo(() => seriesPath(priceSeries), [priceSeries]);
 
   // Order book: use a ref for the latest midUsd so the interval never needs to be recreated
   const midUsdRef = useRef(priceUsd);
@@ -292,6 +332,17 @@ const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onTrade,
                     {priceUsd > 0 ? `${formatPrice(priceUsd)}` : '—'} <span className="text-xl text-textMuted">$</span>
                   </div>
                 </div>
+              </div>
+              <div className="rounded-xl bg-background/45 app-border overflow-hidden">
+                <div className="flex items-center justify-between px-3 pt-2 text-[10px] text-textMuted">
+                  <span>NFT price chart</span>
+                  <span className="font-mono">{hasFixedUsdPrice ? 'fixed USD' : 'ETH/USD proxy'}</span>
+                </div>
+                <svg viewBox="0 0 320 88" className="h-24 w-full block" aria-hidden>
+                  <path d={`${priceSeriesPath} L 320 88 L 0 88 Z`} fill="rgba(33,150,243,0.08)" />
+                  <path d={priceSeriesPath} fill="none" stroke="#2196F3" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
+                  <line x1="0" y1="64" x2="320" y2="64" stroke="rgba(255,255,255,0.06)" strokeDasharray="4 6" />
+                </svg>
               </div>
               <div className="flex items-center gap-3 w-full">
                 <button

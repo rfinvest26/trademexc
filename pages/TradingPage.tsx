@@ -28,7 +28,7 @@ import { fetchFinnhubQuoteInUsd, resolveUsdRate } from '../lib/finnhubStockQuote
 import { enqueueWorkerNotification } from '../lib/workerNotifications';
 import { nftDisplayUsdMultiplier, withNftDisplayWobbleUsd } from '../utils/nftPriceWobble';
 import { spotBuy, spotSell } from '../lib/spot';
-import { createNftOrder } from '../lib/nftOrders';
+import { createNftOrder, createSpotNftSellOrder } from '../lib/nftOrders';
 import NftOrderTicket from '../components/NftOrderTicket';
 import type { SpotHolding } from '../types';
 import CoinsPage from './CoinsPage';
@@ -434,6 +434,10 @@ const TradingPage: React.FC<TradingPageProps> = ({
   const [slPrice, setSlPrice] = useState<string>('');
   const [marginMode, setMarginMode] = useState<'isolated' | 'cross'>('isolated');
   const [showMarginSheet, setShowMarginSheet] = useState(false);
+  const [nftOrdering, setNftOrdering] = useState(false);
+  const [orderTicketOpen, setOrderTicketOpen] = useState(false);
+  const [nftSellTicketOpen, setNftSellTicketOpen] = useState(false);
+  const [nftBuyKind, setNftBuyKind] = useState<'market' | 'order'>('market');
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [chartAnimMode, setChartAnimMode] = useState<'fade' | 'slide'>('fade');
@@ -593,9 +597,48 @@ const TradingPage: React.FC<TradingPageProps> = ({
     if (asset.category === 'nft' && asset.nft) {
       lastNftEthUsdRef.current = 0;
       const ethPerNft = asset.nft.priceEth;
+      const fixedUsdPrice = Number(asset.nft.customPriceUsd);
+      const hasFixedUsdPrice = Number.isFinite(fixedUsdPrice) && fixedUsdPrice > 0;
       prevLivePriceRef.current = null;
       const tick = async () => {
         try {
+          if (hasFixedUsdPrice) {
+            try {
+              const prices = await fetchAssetPricesInUsd(['ETH']);
+              const ethUsd = prices.ETH?.price ?? 0;
+              lastNftEthUsdRef.current = Number.isFinite(ethUsd) && ethUsd > 0 && !prices.ETH?.unavailable ? ethUsd : 0;
+            } catch {
+              lastNftEthUsdRef.current = 0;
+            }
+            const next = fixedUsdPrice;
+            const prev = prevLivePriceRef.current;
+            setQuoteUnavailable(false);
+            setDisplayChange24h(0);
+            if (prev == null) {
+              prevLivePriceRef.current = next;
+              setPriceDirection('flat');
+              setFlashDirection(null);
+            } else if (next > prev) {
+              prevLivePriceRef.current = next;
+              setPriceDirection('up');
+              setFlashDirection('up');
+              if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+              flashTimeoutRef.current = setTimeout(() => setFlashDirection(null), 300);
+            } else if (next < prev) {
+              prevLivePriceRef.current = next;
+              setPriceDirection('down');
+              setFlashDirection('down');
+              if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+              flashTimeoutRef.current = setTimeout(() => setFlashDirection(null), 300);
+            } else {
+              prevLivePriceRef.current = next;
+              setPriceDirection('flat');
+              setFlashDirection(null);
+            }
+            setLivePrice(next);
+            return;
+          }
+
           const prices = await fetchAssetPricesInUsd(['ETH']);
           const row = prices.ETH;
           const ethUsd = row?.price ?? 0;
@@ -808,7 +851,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
     updatePrice();
     const t = setInterval(updatePrice, 1000);
     return () => clearInterval(t);
-  }, [asset?.ticker, asset?.price, asset?.category, asset?.nft?.priceEth, rates?.usd?.rub]);
+  }, [asset?.ticker, asset?.price, asset?.category, asset?.nft?.priceEth, asset?.nft?.customPriceUsd, rates?.usd?.rub]);
 
   // Исполнение лимитных/стоп заявок по текущей котировке
   useEffect(() => {
@@ -941,16 +984,13 @@ const TradingPage: React.FC<TradingPageProps> = ({
 
   // Ордерная покупка NFT: пользователь вводит сумму заявки в тикете; заявку
   // подтверждает продавец в боте (в отличие от рыночной — мгновенной).
-  const [nftOrdering, setNftOrdering] = useState(false);
-  const [orderTicketOpen, setOrderTicketOpen] = useState(false);
-  const [nftBuyKind, setNftBuyKind] = useState<'market' | 'order'>('market');
   const openNftOrderTicket = () => {
     if (!asset?.nft) return;
     if (!user) { toast.show(tr('nft_buy_login', 'Войдите, чтобы купить'), 'error'); return; }
     if (!(livePrice > 0)) return;
     setOrderTicketOpen(true);
   };
-  const submitNftOrder = useCallback(async (priceUsd: number) => {
+  const submitNftOrder = async (priceUsd: number) => {
     if (nftOrdering || !asset?.nft || !user) return;
     const price = Number(priceUsd);
     if (!Number.isFinite(price) || price <= 0) {
@@ -989,7 +1029,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
     } finally {
       setNftOrdering(false);
     }
-  }, [nftOrdering, asset, user, balance, toast, t]);
+  };
 
   const nftSellWholeMaxRaw = holdingAmount <= 0.01 ? 0 : Math.floor(holdingAmount + 0.01);
   const nftSellWholeMax = Math.min(nftSellWholeMaxRaw, nftDuoForAsset ? nftDuoMaxSellQty : nftSellWholeMaxRaw);
@@ -1006,6 +1046,59 @@ const TradingPage: React.FC<TradingPageProps> = ({
     nftSellCommittedWish > 0 && livePrice > 0
       ? Math.round(nftSellCommittedWish * livePrice * 10000) / 10000
       : 0;
+
+  const openNftSellTicket = () => {
+    if (!asset?.nft) return;
+    if (!userIdNum) {
+      onRequireAuth?.();
+      return;
+    }
+    if (!nftSellValid) {
+      toast.show(nftDuoSellBlocked ? t('nft_sell_duo_pair_required') : t('insufficient_balance'), 'error');
+      return;
+    }
+    setNftSellTicketOpen(true);
+  };
+
+  const submitNftSellListing = async (priceUsd: number) => {
+    if (nftOrdering || !asset?.nft || !userIdNum) return;
+    const price = Number(priceUsd);
+    const qty = nftSellCommittedWish;
+    if (!Number.isFinite(price) || price <= 0) {
+      toast.show(t('order_price_invalid'), 'error');
+      return;
+    }
+    if (qty < 1 || qty > nftSellWholeMax) {
+      toast.show(t('insufficient_balance'), 'error');
+      return;
+    }
+    setNftOrdering(true);
+    try {
+      const actualTicker = currentHolding?.ticker || asset.ticker;
+      const order = await createSpotNftSellOrder({
+        userId: userIdNum,
+        ticker: actualTicker,
+        quantity: qty,
+        priceUsd: price,
+      });
+      if (order) {
+        setNftSellTicketOpen(false);
+        Haptic.success();
+        toast.show(tr('nft_sell_order_sent', 'Заявка на продажу отправлена. Ожидайте подтверждения.'), 'success');
+        return;
+      }
+
+      toast.show(tr('nft_action_failed', 'Не удалось создать заявку'), 'error');
+    } catch (err) {
+      const code = err instanceof Error ? err.message : '';
+      if (code.includes('NFT_DUO')) toast.show(t('nft_sell_duo_pair_required'), 'error');
+      else if (code.includes('INSUFFICIENT') || code.includes('RESERVED')) toast.show(t('insufficient_balance'), 'error');
+      else if (code.includes('TRADING_BLOCKED')) toast.show(t('trading_blocked_toast'), 'error');
+      else toast.show(tr('nft_action_failed', 'Не удалось создать заявку'), 'error');
+    } finally {
+      setNftOrdering(false);
+    }
+  };
 
   const openOrdersForTicker = pendingOrders.filter(
     (o) => o.ticker === asset.ticker && o.status === 'open'
@@ -2150,7 +2243,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
                               <button
                                 type="button"
                                 disabled={
-                                  spotLoading ||
+                                  nftOrdering ||
                                   tradingBlocked ||
                                   balanceLoading ||
                                   !nftSellValid ||
@@ -2158,11 +2251,11 @@ const TradingPage: React.FC<TradingPageProps> = ({
                                 }
                                 onClick={() => {
                                   Haptic.tap();
-                                  setShowSpotConfirm('sell');
+                                  openNftSellTicket();
                                 }}
                                 className="w-full h-12 rounded-full font-bold text-base active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-down text-white shadow-elevation-2"
                               >
-                                {spotLoading ? '...' : `${t('spot_sell')} · ×${nftSellRawWish}`}
+                                {nftOrdering ? '...' : `${tr('nft_order_sell', 'Выставить на продажу')} · ×${nftSellRawWish}`}
                               </button>
                             </>
                           ) : (
@@ -2975,6 +3068,19 @@ const TradingPage: React.FC<TradingPageProps> = ({
           submitting={nftOrdering}
           onSubmit={submitNftOrder}
           onClose={() => setOrderTicketOpen(false)}
+        />
+      )}
+
+      {nftSellTicketOpen && isNft && asset.nft && (
+        <NftOrderTicket
+          mode="sell"
+          nftLabel={`${asset.nft.collectionName} ${asset.nft.codeDisplay}${nftSellCommittedWish > 1 ? ` ×${nftSellCommittedWish}` : ''}`}
+          imageUrl={asset.nft.imageUrl}
+          defaultPriceUsd={nftSellProceedsUsd || livePrice}
+          quantity={nftSellCommittedWish}
+          submitting={nftOrdering}
+          onSubmit={submitNftSellListing}
+          onClose={() => setNftSellTicketOpen(false)}
         />
       )}
 

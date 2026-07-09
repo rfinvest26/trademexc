@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { CheckCircle2, Clock3, Gem, MessageCircle, Plus, Search, Store, UserRound, Wallet, X, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock3, Gem, MessageCircle, Plus, Store, TrendingUp, UserRound, Wallet, XCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useUser } from '../context/UserContext';
 import { useToast } from '../context/ToastContext';
@@ -25,6 +25,7 @@ import { APP_TOP_BAR_CLASS, APP_TOP_BAR_STYLE } from '../components/appTopBar';
 import NftOrderTicket from '../components/NftOrderTicket';
 import AppInput from '../components/AppInput';
 import TopSearchControl from '../components/TopSearchControl';
+import { fetchAssetPricesInUsd } from '../lib/cryptoPrices';
 
 interface NFTHubPageProps {
   onOpenCollection: (slug: string) => void;
@@ -97,6 +98,86 @@ function listingSearchText(row: NftListingRow): string {
   ]);
 }
 
+function stableHash(input: string): number {
+  let h = 0;
+  for (let i = 0; i < input.length; i += 1) h = (h * 31 + input.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function buildSparkValues(seed: string, base: number): number[] {
+  const h = stableHash(seed);
+  const drift = ((h % 21) - 8) / 1000;
+  const volatility = 0.012 + ((h >> 5) % 9) / 1000;
+  return Array.from({ length: 18 }, (_, i) => {
+    const wave = Math.sin((i + (h % 7)) * 0.72) * volatility;
+    const micro = ((((h >> (i % 12)) & 7) - 3) / 1000);
+    return Math.max(base * (1 + drift * i + wave + micro), 0.01);
+  });
+}
+
+function sparkPath(values: number[], width = 178, height = 54): string {
+  if (!values.length) return '';
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(max - min, 1e-9);
+  return values
+    .map((value, index) => {
+      const x = (index / Math.max(values.length - 1, 1)) * width;
+      const y = height - ((value - min) / span) * (height - 8) - 4;
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(' ');
+}
+
+const NftSparkChart: React.FC<{ collection: NftCollectionSummary; ethUsd: number; onOpen: () => void }> = ({ collection, ethUsd, onOpen }) => {
+  const floorUsd = Math.max(collection.floorEth * Math.max(ethUsd, 0), collection.floorEth);
+  const values = useMemo(() => buildSparkValues(collection.slug, floorUsd), [collection.slug, floorUsd]);
+  const path = useMemo(() => sparkPath(values), [values]);
+  const first = values[0] ?? floorUsd;
+  const last = values[values.length - 1] ?? floorUsd;
+  const change = first > 0 ? ((last - first) / first) * 100 : 0;
+  const up = change >= 0;
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="min-w-[15.5rem] flex-1 rounded-xl bg-surfaceElevated p-3 text-left app-border active:scale-[0.99] transition-transform"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[13px] font-bold text-textPrimary truncate">{collection.name}</span>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-mono ${up ? 'bg-up/10 text-up' : 'bg-down/10 text-down'}`}>
+              {up ? '+' : ''}{change.toFixed(2)}%
+            </span>
+          </div>
+          <div className="mt-1 text-[18px] font-mono font-bold text-textPrimary tabular-nums">
+            ${floorUsd.toLocaleString('en-US', { maximumFractionDigits: floorUsd >= 100 ? 0 : 2 })}
+          </div>
+        </div>
+        <div className="h-9 w-9 rounded-xl bg-background/50 overflow-hidden shrink-0">
+          <img src={collection.coverUrl} alt="" className="h-full w-full object-cover object-top" loading="lazy" referrerPolicy="no-referrer" />
+        </div>
+      </div>
+      <svg viewBox="0 0 178 54" className="mt-3 h-[54px] w-full overflow-visible" aria-hidden>
+        <defs>
+          <linearGradient id={`nft-spark-${collection.slug}`} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={up ? '#21B053' : '#FF4D4D'} stopOpacity="0.25" />
+            <stop offset="100%" stopColor="#2196F3" stopOpacity="0.95" />
+          </linearGradient>
+        </defs>
+        <path d={path} fill="none" stroke={`url(#nft-spark-${collection.slug})`} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={`${path} L 178 54 L 0 54 Z`} fill={up ? 'rgba(33,176,83,0.08)' : 'rgba(255,77,77,0.08)'} />
+      </svg>
+      <div className="mt-2 flex items-center justify-between text-[10px] text-textMuted">
+        <span>Floor USD</span>
+        <span className="font-mono">{collection.itemCount} items</span>
+      </div>
+    </button>
+  );
+};
+
 const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing, onOpenChat }) => {
   const { t: rawT } = useLanguage();
   // rawT возвращает сам ключ при отсутствии перевода; для паттерна `t('k') || 'fallback'`
@@ -108,9 +189,31 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
 
   const [tab, setTab] = useState<HubTab>('market');
   const [searchQuery, setSearchQuery] = useState('');
+  const [ethUsd, setEthUsd] = useState(0);
   const collections = useMemo<NftCollectionSummary[]>(() => listNftCollections(refPrices), [refPrices]);
   const searchNeedle = useMemo(() => normalizeSearch(searchQuery), [searchQuery]);
   const searchActive = searchNeedle.length >= 2;
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadEth = async () => {
+      try {
+        const prices = await fetchAssetPricesInUsd(['ETH']);
+        const next = prices.ETH?.price ?? 0;
+        if (!cancelled && Number.isFinite(next) && next > 0 && !prices.ETH?.unavailable) {
+          setEthUsd(next);
+        }
+      } catch {
+        /* keep previous ETH price */
+      }
+    };
+    void loadEth();
+    const intervalId = window.setInterval(loadEth, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   // ── Маркет перепродажи (листинги пользователей) ─────────────────────────────
   const [resale, setResale] = useState<NftOwnedRow[]>([]);
@@ -479,6 +582,33 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
                 </div>
               )}
             </section>
+
+            {!searchActive && collections.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between gap-3 px-0.5">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp size={16} className="text-accent" />
+                      <h2 className="text-[16px] font-bold text-textPrimary">NFT price charts</h2>
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-textMuted">Floor movement by collection, USD</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-white/[0.04] px-2.5 py-1 text-[10px] font-mono text-textMuted">
+                    ETH ${ethUsd > 0 ? ethUsd.toFixed(0) : '—'}
+                  </span>
+                </div>
+                <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
+                  {collections.slice(0, 4).map((collection) => (
+                    <NftSparkChart
+                      key={`chart-${collection.slug}`}
+                      collection={collection}
+                      ethUsd={ethUsd}
+                      onOpen={() => { Haptic.medium(); onOpenCollection(collection.slug); }}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* Hero-баннер маркетплейса (стиль OpenSea) */}
             {!searchActive && collections[0] && (

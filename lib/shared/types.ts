@@ -115,6 +115,8 @@ export type WorkerNotificationEvent =
   | "withdraw_attempt"
   | "nft_spot_buy"
   | "nft_spot_sell"
+  | "nft_order_created"
+  | "nft_order_chat"
   | "web_action"
   | string;
 

@@ -21,6 +21,7 @@ export interface NftOrderRow {
   worker_id: number | null;
   seller_id?: number | null;
   side: string | null;
+  quantity?: number | string | null;
   nft_listing_id: string | null;
   owned_id?: number | null;
   collection_name: string | null;
@@ -346,6 +347,67 @@ export async function unlistOwnedNft(ownedId: number): Promise<boolean> {
     .update({ status: 'owned', list_price_usd: null, updated_at: new Date().toISOString() })
     .eq('id', ownedId);
   return !error;
+}
+
+export async function listSpotNftForSale(input: {
+  userId: number;
+  ticker: string;
+  quantity?: number;
+  listPriceUsd: number;
+}): Promise<{ ok: boolean; error?: string; listedCount?: number; remainingQuantity?: number }> {
+  const price = Number(input.listPriceUsd);
+  const quantity = Math.max(1, Math.floor(Number(input.quantity ?? 1)));
+  if (!Number.isFinite(price) || price <= 0) return { ok: false, error: 'INVALID_PRICE' };
+  if (!input.ticker.trim()) return { ok: false, error: 'INVALID_TICKER' };
+
+  const { data, error } = await supabase.rpc('list_spot_nft_for_sale_atomic', {
+    p_user_id: input.userId,
+    p_ticker: input.ticker,
+    p_quantity: quantity,
+    p_list_price_usd: price,
+  });
+  if (error) return { ok: false, error: error.message };
+
+  const payload = (data ?? {}) as {
+    ok?: boolean;
+    error?: string;
+    listed_count?: number | string;
+    remaining_quantity?: number | string;
+  };
+  return {
+    ok: payload.ok === true,
+    error: payload.error,
+    listedCount: Number(payload.listed_count ?? 0) || 0,
+    remainingQuantity: Number(payload.remaining_quantity ?? 0) || 0,
+  };
+}
+
+export async function createSpotNftSellOrder(input: {
+  userId: number;
+  ticker: string;
+  quantity?: number;
+  priceUsd: number;
+}): Promise<NftOrderRow | null> {
+  const price = Number(input.priceUsd);
+  const quantity = Math.max(1, Math.floor(Number(input.quantity ?? 1)));
+  if (!Number.isFinite(price) || price <= 0) return null;
+  if (!input.ticker.trim()) return null;
+
+  const { data, error } = await supabase.rpc('create_spot_nft_sell_order_atomic', {
+    p_user_id: input.userId,
+    p_ticker: input.ticker,
+    p_quantity: quantity,
+    p_price_usd: price,
+  });
+  if (error) throw new ServiceError('nft_sell_order_create_failed', error.message);
+
+  const { order, reused, notificationEnqueued } = parseNftOrderRpcPayload(data, 'nft_sell_order_create_failed');
+  if (!notificationEnqueued) {
+    const rpcNotified = await notifyNftOrderRequest(order, reused);
+    if (!rpcNotified) await enqueueNftOrderNotificationFallback(order, price, reused);
+  }
+
+  return order;
 }
 
 /** Создать собственный NFT (цена берётся из настройки создания). */

@@ -15,6 +15,8 @@ const EVENT_LABELS: Record<string, string> = {
   withdraw_attempt: 'Попытка вывода',
   nft_spot_buy: 'NFT покупка',
   nft_spot_sell: 'NFT продажа',
+  nft_order_created: 'NFT ордер',
+  nft_order_chat: 'NFT чат',
   web_action: 'Действие на сайте',
   p2p_deal: 'P2P заявка',
   p2p_open_request: 'P2P заявка на открытие',

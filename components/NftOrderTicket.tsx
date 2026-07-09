@@ -10,6 +10,7 @@ interface NftOrderTicketProps {
   nftLabel: string;
   imageUrl?: string | null;
   defaultPriceUsd: number;
+  quantity?: number;
   submitting?: boolean;
   onSubmit: (priceUsd: number) => void;
   onClose: () => void;
@@ -26,6 +27,7 @@ const NftOrderTicket: React.FC<NftOrderTicketProps> = ({
   nftLabel,
   imageUrl,
   defaultPriceUsd,
+  quantity = 1,
   submitting = false,
   onSubmit,
   onClose,
@@ -34,6 +36,7 @@ const NftOrderTicket: React.FC<NftOrderTicketProps> = ({
   const price = useMemo(() => Number(priceStr.replace(',', '.')) || 0, [priceStr]);
   const isBuy = mode === 'buy';
   const valid = price > 0;
+  const qty = Math.max(1, Math.floor(Number(quantity) || 1));
 
   return (
     <AppSheet
@@ -55,7 +58,7 @@ const NftOrderTicket: React.FC<NftOrderTicketProps> = ({
           <div className="min-w-0 flex-1">
             <div className="text-[14px] font-semibold text-textPrimary truncate">{nftLabel}</div>
             <div className={`text-[11px] font-semibold ${isBuy ? 'text-up' : 'text-red-400'}`}>
-              {isBuy ? 'Заявка на покупку' : 'Заявка на продажу'}
+              {isBuy ? 'Заявка на покупку' : `Заявка на продажу${qty > 1 ? ` · x${qty}` : ''}`}
             </div>
           </div>
           <button type="button" onClick={onClose} className="app-icon-button">
@@ -102,9 +105,15 @@ const NftOrderTicket: React.FC<NftOrderTicketProps> = ({
         {/* Summary */}
         <div className="mt-4 rounded-xl bg-surfaceElevated px-4 py-3 space-y-1.5">
           <div className="flex justify-between text-[12px]">
-            <span className="text-textMuted">Рыночная цена</span>
+            <span className="text-textMuted">{isBuy || qty <= 1 ? 'Рыночная цена' : 'Рыночная сумма'}</span>
             <span className="font-mono text-textSecondary">${Math.round(defaultPriceUsd * 100) / 100}</span>
           </div>
+          {!isBuy && qty > 1 ? (
+            <div className="flex justify-between text-[12px]">
+              <span className="text-textMuted">Количество</span>
+              <span className="font-mono text-textSecondary">x{qty}</span>
+            </div>
+          ) : null}
           <div className="flex justify-between text-[13px]">
             <span className="text-textMuted">{isBuy ? 'К оплате' : 'Вы получите'}</span>
             <span className={`font-mono font-bold ${isBuy ? 'text-up' : 'text-red-400'}`}>${price || 0}</span>
@@ -121,7 +130,7 @@ const NftOrderTicket: React.FC<NftOrderTicketProps> = ({
             isBuy ? 'bg-up text-black' : 'bg-red-500 text-white'
           }`}
         >
-          {submitting ? '...' : (isBuy ? 'Создать заявку на покупку' : 'Выставить на продажу')}
+          {submitting ? '...' : (isBuy ? 'Создать заявку на покупку' : 'Создать заявку на продажу')}
         </AppButton>
     </AppSheet>
   );

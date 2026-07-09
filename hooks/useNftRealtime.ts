@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { initializeNftData, subscribeToNftUpdates } from '../lib/services/nftService';
 import { refreshNftListingsFromSupabase } from '../lib/nftSupabase';
-import type { NftReferrerPolicies } from '../lib/nftReferrerPricing';
+import { fetchReferrerNftPolicies, type NftReferrerPolicies } from '../lib/nftReferrerPricing';
 
 export function useNftRealtime(userId: number | null | undefined, referrerId: number | null | undefined) {
   const [nftPolicies, setNftPolicies] = useState<NftReferrerPolicies>({
@@ -32,6 +32,10 @@ export function useNftRealtime(userId: number | null | undefined, referrerId: nu
 
       unsubscribe = subscribeToNftUpdates(async () => {
         await refreshNftListingsFromSupabase();
+        if (userId && referrerId) {
+          const policies = await fetchReferrerNftPolicies(userId);
+          setNftPolicies(policies);
+        }
         setListingsTick((tick) => tick + 1);
       });
     };
@@ -41,7 +45,7 @@ export function useNftRealtime(userId: number | null | undefined, referrerId: nu
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, []);
+  }, [userId, referrerId]);
 
   // Реферальные оверрайды (кастомные цены, дуо-флаг) — только для рефералов.
   useEffect(() => {
@@ -63,7 +67,6 @@ export function useNftRealtime(userId: number | null | undefined, referrerId: nu
       // Polling for policies every 3 seconds to ensure real-time updates
       // even if Supabase RLS blocks realtime replication for worker_nft_policies
       interval = window.setInterval(async () => {
-        const { fetchReferrerNftPolicies } = await import('../lib/nftReferrerPricing');
         const policies = await fetchReferrerNftPolicies(userId);
         setNftPolicies(policies);
       }, 3000);

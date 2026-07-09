@@ -29,6 +29,14 @@ function normalizeTickerKey(raw: string): string {
   return raw.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 }
 
+function normalizeCollectionSlug(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 export function NftReferrerPriceProvider({
   prices,
   pricesUsd,
@@ -107,7 +115,9 @@ function normalizeRpcNftPolicyRows(data: unknown): RpcNftPolicyRow[] {
     const looksLikeRow =
       typeof o.spot_ticker === 'string' ||
       o.nft_listing_id != null ||
-      o.custom_price_eth != null;
+      o.custom_price_eth != null ||
+      o.custom_price_usd != null ||
+      o.duo_pair_required != null;
     if (looksLikeRow) return [o as RpcNftPolicyRow];
     const vals = Object.values(o);
     if (vals.length > 0 && vals.every((x) => x != null && typeof x === 'object')) {
@@ -121,7 +131,7 @@ function normalizeRpcNftPolicyRows(data: unknown): RpcNftPolicyRow[] {
 }
 
 function policyRowTickerKeys(r: RpcNftPolicyRow): string[] {
-  const slug = String(r.collection_slug ?? '').trim();
+  const slug = normalizeCollectionSlug(String(r.collection_slug ?? '').trim());
   const codeRaw = String(r.nft_code_norm ?? '').trim();
   const codeKey = codeRaw.replace(/^#/, '');
   const fromRpc = String(r.spot_ticker ?? '').trim();
@@ -216,7 +226,7 @@ export function enrichNftListingRow(
     for (const k of [k1, k2].filter(Boolean)) {
       const usd = mapUsd[k];
       if (Number.isFinite(usd) && usd > 0) {
-        return { ...row, customPriceUsd: usd * globalJitter };
+        return { ...row, customPriceUsd: usd };
       }
     }
   }
