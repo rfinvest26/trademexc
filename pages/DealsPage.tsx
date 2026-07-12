@@ -50,6 +50,8 @@ type TabId = 'ACTIVE' | 'HISTORY' | 'ASSETS';
 
 type PortfolioNftRow = {
   key: string;
+  /** Рыночный тикер для расчёта изменения стоимости; у уникальных NFT его нет. */
+  ticker: string | null;
   /** Есть каталожный листинг — строку открываем на единой странице NFT. Нет — в «Мои NFT» (уникальный, созданный пользователем предмет). */
   catalogSlug: string | null;
   catalogCodeKey: string | null;
@@ -192,6 +194,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
       const priceUsd = Number.isFinite(baseUsd) && baseUsd > 0 ? withNftDisplayWobbleUsd(baseUsd, ticker, now) : 1;
       return {
         key: `catalog-${ticker}`,
+        ticker,
         catalogSlug: row.collectionSlug,
         catalogCodeKey: row.codeKey,
         collectionName: row.collectionName,
@@ -212,6 +215,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
       const priceSafe = Number.isFinite(price) && price > 0 ? price : 1;
       return {
         key: `owned-${row.id}`,
+        ticker: null,
         catalogSlug: null,
         catalogCodeKey: null,
         collectionName: listing.collectionName,
@@ -308,7 +312,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
       0
     );
     const nftDay = nftPortfolioRows.reduce((s, r) => {
-      const chTicker = assetsByTicker[r.asset.ticker]?.change24h ?? assetsByTicker.ETH?.change24h ?? 0;
+      const chTicker = (r.ticker ? assetsByTicker[r.ticker]?.change24h : undefined) ?? assetsByTicker.ETH?.change24h ?? 0;
       return s + (r.valueUsd ?? 0) * ((chTicker as number) / 100);
     }, 0);
     return spotCrypto + nftDay;
