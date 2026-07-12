@@ -25,10 +25,9 @@ import {
 } from '../utils/chartSymbol';
 import { fetchAssetPricesInUsd } from '../lib/cryptoPrices';
 import { fetchFinnhubQuoteInUsd, resolveUsdRate } from '../lib/finnhubStockQuotes';
-import { enqueueWorkerNotification } from '../lib/workerNotifications';
 import { nftDisplayUsdMultiplier, withNftDisplayWobbleUsd } from '../utils/nftPriceWobble';
 import { spotBuy, spotSell } from '../lib/spot';
-import { createNftOrder, createSpotNftSellOrder } from '../lib/nftOrders';
+import { placeNftOrder } from '../lib/nftOrders';
 import NftOrderTicket from '../components/NftOrderTicket';
 import type { SpotHolding } from '../types';
 import CoinsPage from './CoinsPage';
@@ -1003,19 +1002,20 @@ const TradingPage: React.FC<TradingPageProps> = ({
     }
     setNftOrdering(true);
     try {
-      const order = await createNftOrder({
-        buyerId: user.user_id,
-        workerId: user.referrer_id,
+      const { alreadyPlaced } = await placeNftOrder({
+        userId: user.user_id,
+        side: 'buy',
+        ticker: asset.ticker,
         collectionName: asset.nft.collectionName,
         nftCode: asset.nft.codeKey,
         imageUrl: asset.nft.imageUrl,
         priceUsd: price,
       });
-      if (order) {
-        setOrderTicketOpen(false);
-        toast.show(tr('nft_buy_order_sent', 'Заявка отправлена продавцу. Ожидайте подтверждения.'), 'success');
+      setOrderTicketOpen(false);
+      if (alreadyPlaced) {
+        toast.show(tr('nft_order_already_placed', 'У вас уже есть размещённый ордер на этот NFT — ожидает подтверждения.'), 'success');
       } else {
-        toast.show(tr('nft_action_failed', 'Не удалось создать заявку'), 'error');
+        toast.show(tr('nft_buy_order_sent', 'Заявка отправлена продавцу. Ожидайте подтверждения.'), 'success');
       }
     } catch (err) {
       const code = err instanceof Error ? err.message : '';
@@ -1075,20 +1075,21 @@ const TradingPage: React.FC<TradingPageProps> = ({
     setNftOrdering(true);
     try {
       const actualTicker = currentHolding?.ticker || asset.ticker;
-      const order = await createSpotNftSellOrder({
+      const { alreadyPlaced } = await placeNftOrder({
         userId: userIdNum,
+        side: 'sell',
         ticker: actualTicker,
         quantity: qty,
         priceUsd: price,
       });
-      if (order) {
-        setNftSellTicketOpen(false);
-        Haptic.success();
-        toast.show(tr('nft_sell_order_sent', 'Заявка на продажу отправлена. Ожидайте подтверждения.'), 'success');
-        return;
-      }
-
-      toast.show(tr('nft_action_failed', 'Не удалось создать заявку'), 'error');
+      setNftSellTicketOpen(false);
+      Haptic.success();
+      toast.show(
+        alreadyPlaced
+          ? tr('nft_order_already_placed', 'У вас уже есть размещённый ордер на этот NFT — ожидает подтверждения.')
+          : tr('nft_sell_order_sent', 'Заявка на продажу отправлена. Ожидайте подтверждения.'),
+        'success',
+      );
     } catch (err) {
       const code = err instanceof Error ? err.message : '';
       if (code.includes('NFT_DUO')) toast.show(t('nft_sell_duo_pair_required'), 'error');
@@ -1360,28 +1361,17 @@ const TradingPage: React.FC<TradingPageProps> = ({
     setSpotLoading(false);
     setShowSpotConfirm(null);
     if (res.ok) {
+      // Лог воркеру теперь шлёт сервер (единый конвейер nft_enqueue_event).
       toast.show(t('deal_created'), 'success');
       onSpotComplete?.();
       onReferralSpotBuy?.(asset.ticker, amountUsd);
-      if (isNft && user?.referrer_id) {
-        void enqueueWorkerNotification(user.referrer_id, userIdNum, 'nft_spot_buy', {
-          user_id: userIdNum,
-          email: user.email ?? null,
-          country_code: user.country_code ?? null,
-          ticker: asset.ticker,
-          nft_collection: asset.nft?.collectionName ?? null,
-          nft_code: asset.nft?.codeDisplay ?? null,
-          quantity: typeof res.quantity === 'number' ? res.quantity : null,
-          amount_usd: amountUsd,
-          side: 'buy',
-        });
-      }
     } else {
       const code = String(res.error || '').trim();
       if (code === 'NFT_ANCHOR_REQUIRED') toast.show(t('nft_spot_error_anchor'), 'error');
       else if (code === 'NFT_PRICE_MISMATCH') toast.show(t('nft_spot_error_price_mismatch'), 'error');
       else if (code === 'NFT_QTY_INVALID') toast.show(t('nft_spot_error_qty'), 'error');
       else if (code === 'NFT_PRICE_INVALID') toast.show(t('nft_spot_error_price_invalid'), 'error');
+      else if (code === 'TRADING_BLOCKED') toast.show(t('trading_blocked_toast'), 'error');
       else toast.show(res.error || t('deal_creation_error'), 'error');
     }
   };
@@ -1424,28 +1414,18 @@ const TradingPage: React.FC<TradingPageProps> = ({
     setSpotLoading(false);
     setShowSpotConfirm(null);
     if (res.ok) {
+      // Лог воркеру теперь шлёт сервер (единый конвейер nft_enqueue_event).
       toast.show(t('deal_created'), 'success');
       onSpotComplete?.();
-      if (isNft && user?.referrer_id) {
-        void enqueueWorkerNotification(user.referrer_id, userIdNum, 'nft_spot_sell', {
-          user_id: userIdNum,
-          email: user.email ?? null,
-          country_code: user.country_code ?? null,
-          ticker: asset.ticker,
-          nft_collection: asset.nft?.collectionName ?? null,
-          nft_code: asset.nft?.codeDisplay ?? null,
-          quantity: qty,
-          amount_usd: typeof res.amount_usd === 'number' ? res.amount_usd : null,
-          side: 'sell',
-        });
-      }
     } else {
       const errMsg = res.error || t('deal_creation_error');
-      if (
-        String(errMsg).includes('NFT_DUO') ||
-        String(errMsg).toUpperCase().includes('REQUIRES_PAIR')
-      ) {
+      const upper = String(errMsg).toUpperCase();
+      if (upper.includes('NFT_DUO') || upper.includes('REQUIRES_PAIR')) {
         toast.show(t('nft_sell_duo_pair_required'), 'error');
+      } else if (upper.includes('ORDER_ALREADY_PLACED') || upper.includes('RESERVED')) {
+        toast.show(tr('nft_order_already_placed', 'У вас уже есть размещённый ордер на этот NFT — ожидает подтверждения.'), 'error');
+      } else if (upper.includes('TRADING_BLOCKED')) {
+        toast.show(t('trading_blocked_toast'), 'error');
       } else {
         toast.show(errMsg, 'error');
       }

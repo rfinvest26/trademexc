@@ -154,10 +154,10 @@ const NftOrderTicket: React.FC<NftOrderTicketProps> = ({
         {/* Summary */}
         <div className="mt-4 rounded-xl bg-surfaceElevated px-4 py-3 space-y-1.5">
           <div className="flex justify-between text-[12px]">
-            <span className="text-textMuted">{isBuy || qty <= 1 ? 'Рыночная цена' : 'Рыночная сумма'}</span>
+            <span className="text-textMuted">{qty <= 1 ? 'Рыночная цена' : 'Рыночная сумма'}</span>
             <span className="font-mono text-textSecondary">${marketPrice}</span>
           </div>
-          {!isBuy && qty > 1 ? (
+          {qty > 1 ? (
             <div className="flex justify-between text-[12px]">
               <span className="text-textMuted">Количество</span>
               <span className="font-mono text-textSecondary">x{qty}</span>

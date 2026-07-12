@@ -15,6 +15,7 @@ interface ProfilePageProps {
   onNavigateToKyc?: () => void;
   onNavigateToLanguage?: () => void;
   onNavigateToSupport?: () => void;
+  onNavigateToNft?: () => void;
 }
 
 function formatUsd(value: number): string {
@@ -55,6 +56,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   onNavigateToKyc,
   onNavigateToLanguage,
   onNavigateToSupport,
+  onNavigateToNft,
 }) => {
   const { user, supportLink } = useUser();
   const { logout } = useWebAuth();
@@ -187,7 +189,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
         {!isGuest && activeNftCount > 0 && (
           <div className="mb-6 bg-surfaceElevated rounded-xl p-4">
-            <div className="flex items-center gap-3 mb-4">
+            <button
+              type="button"
+              onClick={() => {
+                Haptic.tap();
+                onNavigateToNft?.();
+              }}
+              disabled={!onNavigateToNft}
+              className="w-full flex items-center gap-3 mb-4 text-left active:scale-[0.99] transition-transform disabled:active:scale-100"
+            >
               <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center shrink-0">
                 <Gem size={20} className="text-accent" />
               </div>
@@ -197,7 +207,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                   {isRu ? 'Баланс активов:' : 'Total Value:'} <span className="font-mono font-medium text-textPrimary">{formatUsd(pendingNftTotal + ownedNftTotal)}</span>
                 </p>
               </div>
-            </div>
+              {onNavigateToNft && <ChevronRight size={16} className="text-textSubtle shrink-0" />}
+            </button>
 
             <div className="space-y-2">
               {pendingNftOrders.slice(0, 3).map((order) => (
@@ -243,7 +254,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
               })}
             </div>
             {activeNftCount > 3 && (
-              <button type="button" className="w-full mt-3 py-2 text-xs font-semibold text-accent hover:text-accent/80 transition-colors">
+              <button
+                type="button"
+                onClick={() => {
+                  Haptic.tap();
+                  onNavigateToNft?.();
+                }}
+                className="w-full mt-3 py-2 text-xs font-semibold text-accent hover:text-accent/80 transition-colors"
+              >
                 {isRu ? `Показать все (${activeNftCount})` : `View all (${activeNftCount})`}
               </button>
             )}
@@ -270,6 +288,22 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
         <div className="space-y-4">
           <div className="app-panel">
+            {!isGuest && onNavigateToNft && (
+              <button
+                type="button"
+                onClick={() => {
+                  Haptic.tap();
+                  onNavigateToNft();
+                }}
+                className="w-full px-4 py-4 flex items-center justify-between group text-left active:scale-95 transition-all"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Gem size={18} className="text-textSecondary" />
+                  <span className="text-sm font-medium text-textPrimary">NFT</span>
+                </div>
+                <ChevronRight size={16} className="text-textSubtle" />
+              </button>
+            )}
             {onNavigateToLanguage && (
               <button
                 type="button"
@@ -277,7 +311,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                   Haptic.tap();
                   onNavigateToLanguage();
                 }}
-                className="w-full px-4 py-4 flex items-center justify-between group text-left active:scale-95 transition-all"
+                className={`w-full px-4 py-4 flex items-center justify-between group text-left active:scale-95 transition-all ${!isGuest && onNavigateToNft ? 'border-t border-border' : ''}`}
               >
                 <div className="flex items-center gap-2.5">
                   <Languages size={18} className="text-textSecondary" />
@@ -297,7 +331,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                 Haptic.tap();
                 setShowLegalModal(true);
               }}
-              className={`w-full px-4 py-4 flex items-center justify-between group text-left active:scale-95 transition-all ${onNavigateToLanguage ? 'border-t border-border' : ''}`}
+              className={`w-full px-4 py-4 flex items-center justify-between group text-left active:scale-95 transition-all ${onNavigateToLanguage || (!isGuest && onNavigateToNft) ? 'border-t border-border' : ''}`}
             >
               <div className="flex items-center gap-2.5">
                 <FileText size={18} className="text-textSecondary" />

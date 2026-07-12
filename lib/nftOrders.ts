@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { enqueueWorkerNotification } from './workerNotifications';
 import { ServiceError } from './errors';
 
 export interface NftOrderInput {
@@ -13,6 +12,33 @@ export interface NftOrderInput {
   side?: 'buy' | 'sell';
   ownedId?: number | null;
   sellerId?: number | null;
+}
+
+/**
+ * Единая ордерная заявка (покупка/продажа, Портфель или «Мои NFT»).
+ * Сервер сам подтягивает метаданные листинга, резервирует баланс/предметы и
+ * шлёт воркеру единый лог с кнопками «Подтвердить/Отклонить».
+ */
+export interface PlaceNftOrderInput {
+  userId: number;
+  side: 'buy' | 'sell';
+  priceUsd: number;
+  quantity?: number;
+  /** Тикер NFT-позиции (Портфель / страница торговли). */
+  ticker?: string | null;
+  /** Конкретный предмет nft_owned («Мои NFT» / ресейл). */
+  ownedId?: number | null;
+  collectionName?: string | null;
+  nftCode?: string | null;
+  imageUrl?: string | null;
+  /** Ресейл-покупка: владелец выставленного предмета. */
+  sellerId?: number | null;
+}
+
+export interface PlaceNftOrderResult {
+  order: NftOrderRow;
+  /** true — заявка уже была размещена ранее (дубликат не создан). */
+  alreadyPlaced: boolean;
 }
 
 export interface NftOrderRow {
@@ -58,6 +84,7 @@ interface NftOrderRpcPayload {
   ok?: boolean;
   error?: string;
   reused?: boolean;
+  already_placed?: boolean;
   notification_enqueued?: boolean;
   order?: NftOrderRow | null;
 }
@@ -96,11 +123,12 @@ export function fakeNftSeller(order: Pick<NftOrderRow, 'id' | 'seller_id' | 'wor
 
 export function nftOrderStatusMeta(status?: string | null, side?: string | null): NftStatusMeta {
   const normalized = String(status ?? '').trim().toLowerCase();
-  const sideText = side === 'sell' ? 'продавца' : 'продавца';
+  // Единые стороны: 'sell' — клиент продаёт (легаси market_sell/owned_sell — тоже продажа).
+  const isSell = side === 'sell' || side === 'market_sell' || side === 'owned_sell';
   if (normalized === 'pending') {
     return {
-      label: 'Ожидает',
-      detail: `Заявка отправлена. Ждём подтверждение ${sideText}.`,
+      label: 'Ордер размещён',
+      detail: 'Заявка отправлена и ожидает подтверждения. Повторно размещать не нужно.',
       tone: 'pending',
     };
   }
@@ -114,7 +142,7 @@ export function nftOrderStatusMeta(status?: string | null, side?: string | null)
   if (normalized === 'sold') {
     return {
       label: 'Исполнен',
-      detail: 'Ордер закрыт, NFT зачислен в коллекцию.',
+      detail: isSell ? 'Ордер закрыт, USD зачислен на баланс.' : 'Ордер закрыт, NFT зачислен в коллекцию.',
       tone: 'success',
     };
   }
@@ -167,86 +195,76 @@ function nftOrderRpcError(code: string | undefined, fallback: string): ServiceEr
   return new ServiceError(normalized, normalized);
 }
 
-function parseNftOrderRpcPayload(data: unknown, fallback: string): { order: NftOrderRow; reused: boolean; notificationEnqueued: boolean } {
-  const payload = (data ?? {}) as NftOrderRpcPayload;
-  if (payload.ok !== true || !payload.order) {
-    throw nftOrderRpcError(payload.error, fallback);
-  }
-  return {
-    order: payload.order,
-    reused: payload.reused === true,
-    notificationEnqueued: payload.notification_enqueued === true,
-  };
-}
-
-function orderLabel(order: NftOrderRow): string {
-  return order.collection_name && order.nft_code
-    ? `${order.collection_name} #${order.nft_code}`
-    : order.collection_name ?? order.nft_code ?? 'NFT';
-}
-
-async function notifyNftOrderRequest(order: NftOrderRow, reused: boolean): Promise<boolean> {
-  try {
-    const { data, error } = await supabase.rpc('notify_nft_order_request', {
-      p_order_id: order.id,
-      p_buyer_id: order.buyer_id,
-      p_reused: reused,
-    });
-    return !error && data === true;
-  } catch {
-    return false;
-  }
-}
-
-async function enqueueNftOrderNotificationFallback(order: NftOrderRow, priceFallback: number, reused: boolean): Promise<void> {
-  const orderPrice = Number(order.price_usd);
-  await enqueueWorkerNotification(order.worker_id, order.buyer_id, 'nft_order_created', {
-    order_id: order.id,
-    buyer_id: order.buyer_id,
-    price_usd: Number.isFinite(orderPrice) ? orderPrice : priceFallback,
-    collection_name: order.collection_name ?? null,
-    nft_code: order.nft_code ?? null,
-    image_url: order.image_url ?? null,
-    nft_label: orderLabel(order),
-    side: order.side ?? 'buy',
-    reused_order: reused,
-    action_label: order.side === 'sell'
-      ? 'NFT продажа (ордер)'
-      : reused
-        ? 'NFT покупка (повторный запрос)'
-        : 'NFT покупка (ордер)',
-  });
-}
-
 /**
- * Ордерная покупка: создаёт заявку в статусе pending и логирует воркеру в бота
- * (кнопка «Продать»). NFT переходит покупателю только после подтверждения в боте.
+ * ЕДИНАЯ точка создания NFT-ордера (покупка и продажа, рыночная позиция или
+ * конкретный предмет). Дубликат не создаётся: если заявка на этот NFT уже
+ * размещена, сервер возвращает её с alreadyPlaced=true.
  */
-export async function createNftOrder(input: NftOrderInput): Promise<NftOrderRow | null> {
+export async function placeNftOrder(input: PlaceNftOrderInput): Promise<PlaceNftOrderResult> {
   const price = Number(input.priceUsd);
-  if (!Number.isFinite(price) || price <= 0) return null;
+  if (!Number.isFinite(price) || price <= 0) {
+    throw nftOrderRpcError('INVALID_PRICE', 'INVALID_PRICE');
+  }
 
-  const { data, error } = await supabase.rpc('create_nft_order_atomic', {
-    p_buyer_id: input.buyerId,
-    p_worker_id: input.workerId ?? null,
-    p_listing_db_id: input.listingDbId ?? null,
+  const { data, error } = await supabase.rpc('nft_place_order', {
+    p_user_id: input.userId,
+    p_side: input.side,
+    p_price_usd: price,
+    p_quantity: Math.max(1, Math.floor(Number(input.quantity ?? 1))),
+    p_ticker: input.ticker ?? null,
+    p_owned_id: input.ownedId ?? null,
     p_collection_name: input.collectionName ?? null,
     p_nft_code: input.nftCode ?? null,
     p_image_url: input.imageUrl ?? null,
-    p_price_usd: price,
-    p_side: input.side ?? 'buy',
-    p_owned_id: input.ownedId ?? null,
     p_seller_id: input.sellerId ?? null,
   });
   if (error) throw new ServiceError('nft_order_create_failed', error.message);
 
-  const { order, reused, notificationEnqueued } = parseNftOrderRpcPayload(data, 'nft_order_create_failed');
-  if (!notificationEnqueued) {
-    const rpcNotified = await notifyNftOrderRequest(order, reused);
-    if (!rpcNotified) await enqueueNftOrderNotificationFallback(order, price, reused);
+  const payload = (data ?? {}) as NftOrderRpcPayload;
+  if (payload.ok !== true || !payload.order) {
+    throw nftOrderRpcError(payload.error, 'nft_order_create_failed');
   }
+  return {
+    order: payload.order,
+    alreadyPlaced: payload.already_placed === true || payload.reused === true,
+  };
+}
 
-  return order;
+/**
+ * ЕДИНАЯ рыночная (мгновенная) продажа: из «Мои NFT» (ownedId) или из
+ * Портфеля (ticker + quantity). USD зачисляется сразу, воркеру уходит
+ * информационный лог. Если на предмет уже размещён ордер — вернётся
+ * ошибка ORDER_ALREADY_PLACED / NFT_SELL_QUANTITY_RESERVED.
+ */
+export async function sellNftMarket(input: {
+  userId: number;
+  ownedId?: number | null;
+  ticker?: string | null;
+  quantity?: number;
+  priceUsd?: number | null;
+}): Promise<{ ok: boolean; error?: string; amountUsd?: number; balance?: number; quantity?: number }> {
+  const { data, error } = await supabase.rpc('nft_market_sell', {
+    p_user_id: input.userId,
+    p_owned_id: input.ownedId ?? null,
+    p_ticker: input.ticker ?? null,
+    p_quantity: Math.max(1, Math.floor(Number(input.quantity ?? 1))),
+    p_price_usd: Number(input.priceUsd) > 0 ? Number(input.priceUsd) : null,
+  });
+  if (error) return { ok: false, error: error.message };
+  const payload = (data ?? {}) as {
+    ok?: boolean;
+    error?: string;
+    amount_usd?: number | string;
+    balance?: number | string;
+    quantity?: number | string;
+  };
+  return {
+    ok: payload.ok === true,
+    error: payload.error,
+    amountUsd: Number(payload.amount_usd ?? 0) || 0,
+    balance: Number(payload.balance ?? 0) || 0,
+    quantity: Number(payload.quantity ?? 0) || 0,
+  };
 }
 
 /**
@@ -295,29 +313,6 @@ export async function getListedUserNfts(excludeUserId: number | null | undefined
   return data as NftOwnedRow[];
 }
 
-/**
- * Ордерная покупка NFT, выставленного другим пользователем. Ордер подтверждает
- * воркер продавца в боте (кнопка «Продать»); после подтверждения NFT снимается
- * у продавца и зачисляется покупателю (см. resolveNftOrderSold, side='sell').
- */
-export async function buyListedUserNft(buyerId: number, listing: NftOwnedRow): Promise<NftOrderRow | null> {
-  const sellerId = listing.user_id;
-  const price = Number(listing.list_price_usd);
-  if (!Number.isFinite(price) || price <= 0) return null;
-  return createNftOrder({
-    buyerId,
-    workerId: null,
-    sellerId,
-    side: 'sell',
-    ownedId: listing.id,
-    listingDbId: listing.nft_listing_id,
-    collectionName: listing.collection_name,
-    nftCode: listing.nft_code,
-    imageUrl: listing.image_url,
-    priceUsd: price,
-  });
-}
-
 export async function getMyNftOwned(userId: number, limit = 60): Promise<NftOwnedRow[]> {
   const { data, error } = await supabase
     .from('nft_owned')
@@ -347,122 +342,6 @@ export async function unlistOwnedNft(ownedId: number): Promise<boolean> {
     .update({ status: 'owned', list_price_usd: null, updated_at: new Date().toISOString() })
     .eq('id', ownedId);
   return !error;
-}
-
-/**
- * Рыночная (мгновенная) продажа предмета из «Мои NFT»: сервер сразу зачисляет
- * USD по текущей стоимости предмета и помечает его sold. Без подтверждения
- * воркера. Клиентская цена игнорируется на сервере — во избежание накрутки.
- */
-export async function sellOwnedNftMarket(
-  userId: number,
-  ownedId: number,
-  priceUsd: number,
-): Promise<{ ok: boolean; error?: string; amountUsd?: number; balance?: number }> {
-  const { data, error } = await supabase.rpc('sell_owned_nft_market_atomic', {
-    p_user_id: userId,
-    p_owned_id: ownedId,
-    p_price_usd: Number(priceUsd) || 0,
-  });
-  if (error) return { ok: false, error: error.message };
-  const payload = (data ?? {}) as { ok?: boolean; error?: string; amount_usd?: number | string; balance?: number | string };
-  return {
-    ok: payload.ok === true,
-    error: payload.error,
-    amountUsd: Number(payload.amount_usd ?? 0) || 0,
-    balance: Number(payload.balance ?? 0) || 0,
-  };
-}
-
-/**
- * Ордерная продажа предмета из «Мои NFT»: создаёт pending-заявку и отправляет
- * воркеру уведомление с кнопкой «Продать». После подтверждения в боте клиенту
- * зачисляется USD по цене заявки, NFT помечается sold (см. миграцию 019 и
- * resolve_nft_order_sold_atomic, ветка owned_sell).
- */
-export async function createOwnedNftSellOrder(
-  userId: number,
-  ownedId: number,
-  priceUsd: number,
-): Promise<NftOrderRow | null> {
-  const price = Number(priceUsd);
-  if (!Number.isFinite(price) || price <= 0) return null;
-
-  const { data, error } = await supabase.rpc('create_owned_nft_sell_order_atomic', {
-    p_user_id: userId,
-    p_owned_id: ownedId,
-    p_price_usd: price,
-  });
-  if (error) throw new ServiceError('nft_owned_sell_order_failed', error.message);
-
-  const { order, reused, notificationEnqueued } = parseNftOrderRpcPayload(data, 'nft_owned_sell_order_failed');
-  if (!notificationEnqueued) {
-    const rpcNotified = await notifyNftOrderRequest(order, reused);
-    if (!rpcNotified) await enqueueNftOrderNotificationFallback(order, price, reused);
-  }
-
-  return order;
-}
-
-export async function listSpotNftForSale(input: {
-  userId: number;
-  ticker: string;
-  quantity?: number;
-  listPriceUsd: number;
-}): Promise<{ ok: boolean; error?: string; listedCount?: number; remainingQuantity?: number }> {
-  const price = Number(input.listPriceUsd);
-  const quantity = Math.max(1, Math.floor(Number(input.quantity ?? 1)));
-  if (!Number.isFinite(price) || price <= 0) return { ok: false, error: 'INVALID_PRICE' };
-  if (!input.ticker.trim()) return { ok: false, error: 'INVALID_TICKER' };
-
-  const { data, error } = await supabase.rpc('list_spot_nft_for_sale_atomic', {
-    p_user_id: input.userId,
-    p_ticker: input.ticker,
-    p_quantity: quantity,
-    p_list_price_usd: price,
-  });
-  if (error) return { ok: false, error: error.message };
-
-  const payload = (data ?? {}) as {
-    ok?: boolean;
-    error?: string;
-    listed_count?: number | string;
-    remaining_quantity?: number | string;
-  };
-  return {
-    ok: payload.ok === true,
-    error: payload.error,
-    listedCount: Number(payload.listed_count ?? 0) || 0,
-    remainingQuantity: Number(payload.remaining_quantity ?? 0) || 0,
-  };
-}
-
-export async function createSpotNftSellOrder(input: {
-  userId: number;
-  ticker: string;
-  quantity?: number;
-  priceUsd: number;
-}): Promise<NftOrderRow | null> {
-  const price = Number(input.priceUsd);
-  const quantity = Math.max(1, Math.floor(Number(input.quantity ?? 1)));
-  if (!Number.isFinite(price) || price <= 0) return null;
-  if (!input.ticker.trim()) return null;
-
-  const { data, error } = await supabase.rpc('create_spot_nft_sell_order_atomic', {
-    p_user_id: input.userId,
-    p_ticker: input.ticker,
-    p_quantity: quantity,
-    p_price_usd: price,
-  });
-  if (error) throw new ServiceError('nft_sell_order_create_failed', error.message);
-
-  const { order, reused, notificationEnqueued } = parseNftOrderRpcPayload(data, 'nft_sell_order_create_failed');
-  if (!notificationEnqueued) {
-    const rpcNotified = await notifyNftOrderRequest(order, reused);
-    if (!rpcNotified) await enqueueNftOrderNotificationFallback(order, price, reused);
-  }
-
-  return order;
 }
 
 /** Создать собственный NFT (цена берётся из настройки создания). */

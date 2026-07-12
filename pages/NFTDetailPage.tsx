@@ -1,15 +1,17 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, Check, ChevronDown, Copy, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Copy, MessageCircle, Minus, Plus } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useUser } from '../context/UserContext';
 import { useToast } from '../context/ToastContext';
-import { ensureNftOrderForChat, fakeNftSeller } from '../lib/nftOrders';
+import { ensureNftOrderForChat, fakeNftSeller, placeNftOrder, sellNftMarket } from '../lib/nftOrders';
+import { spotBuy } from '../lib/spot';
 import { fetchAssetPricesInUsd } from '../lib/cryptoPrices';
-import { getNftListingsForCollection, nftListingToAsset, nftTickerForListing, type NftListingRow } from '../lib/nftCatalog';
+import { getNftListingsForCollection, nftTickerForListing, type NftListingRow } from '../lib/nftCatalog';
 import { enrichNftListingRow, enrichNftListings, useNftReferrerPriceMap, useNftReferrerPriceUsdMap, useNftMarketJitter, useNftListingsTick, useNftReferrerDuoByTicker } from '../lib/nftReferrerPricing';
 import { withNftDisplayWobbleUsd } from '../utils/nftPriceWobble';
-import type { Asset } from '../types';
+import { parseDiscreteNftQtyString, nftSellWishFromUi, nftSpotBuyTotals } from '../utils/nftTradeMath';
+import type { SpotHolding } from '../types';
 import { Haptic } from '../utils/haptics';
 import {
   APP_TOP_BAR_CLASS,
@@ -17,6 +19,9 @@ import {
   APP_TOP_BAR_STYLE,
 } from '../components/appTopBar';
 import NftHorizontalStrip from '../components/NftHorizontalStrip';
+import NftOrderTicket from '../components/NftOrderTicket';
+
+const MIN_DEAL_USD = 5;
 
 export interface NftChatContext {
   orderId: number;
@@ -33,8 +38,9 @@ export interface NftChatContext {
 interface NFTDetailPageProps {
   listing: NftListingRow;
   onBack: () => void;
-  onTrade: (asset: Asset) => void;
   onOpenChat: (ctx: NftChatContext) => void;
+  spotHoldings: SpotHolding[];
+  onSpotComplete?: () => void;
 }
 
 type BookRow = { price: number; size: number };
@@ -85,14 +91,50 @@ function seriesPath(values: number[], width = 320, height = 88): string {
     .join(' ');
 }
 
-const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onTrade, onOpenChat }) => {
+function nftTradeErrorText(code: string | undefined, tr: (key: string, fallback: string) => string): string {
+  switch (code) {
+    case 'INSUFFICIENT_BALANCE':
+      return tr('insufficient_balance', 'Недостаточно средств');
+    case 'INSUFFICIENT_QUANTITY':
+      return tr('nft_sell_unavailable', 'Недостаточно NFT для продажи');
+    case 'TRADING_BLOCKED':
+      return tr('trading_blocked_toast', 'Торговля заблокирована');
+    case 'WORKER_NOT_FOUND':
+      return tr('nft_sell_no_worker', 'Недоступно: не назначен воркер');
+    case 'NFT_DUO_REQUIRES_PAIR':
+      return tr('nft_sell_duo_pair_required', 'Нужна пара: нельзя продать последний NFT коллекции');
+    case 'ORDER_ALREADY_PLACED':
+    case 'NFT_SELL_QUANTITY_RESERVED':
+      return tr('nft_order_already_placed', 'У вас уже есть размещённый ордер на этот NFT — ожидает подтверждения.');
+    case 'NFT_QTY_INVALID':
+      return tr('nft_spot_error_qty', 'Некорректное количество');
+    case 'INVALID_PRICE':
+    case 'NFT_PRICE_INVALID':
+      return tr('order_price_invalid', 'Некорректная цена');
+    case 'NFT_NOT_AVAILABLE':
+      return tr('nft_sell_unavailable', 'NFT уже продан или недоступен');
+    default:
+      return tr('nft_action_failed', 'Не удалось');
+  }
+}
+
+const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onOpenChat, spotHoldings, onSpotComplete }) => {
   const { t } = useLanguage();
   const tr = (key: string, fallback: string) => { const v = t(key); return v === key ? fallback : v; };
-  const { formatPrice, currencyCode } = useCurrency();
-  const { user } = useUser();
+  const { formatPrice, currencyCode, convertToUsd } = useCurrency();
+  const { user, refreshUser } = useUser();
   const toast = useToast();
   const [openingChat, setOpeningChat] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [tradeTab, setTradeTab] = useState<'buy' | 'sell'>('buy');
+  const [buyKind, setBuyKind] = useState<'market' | 'order'>('market');
+  const [sellKind, setSellKind] = useState<'market' | 'order'>('market');
+  const [qtyBuyStr, setQtyBuyStr] = useState('1');
+  const [qtySellStr, setQtySellStr] = useState('1');
+  const [buying, setBuying] = useState(false);
+  const [selling, setSelling] = useState(false);
+  const [buyTicketOpen, setBuyTicketOpen] = useState(false);
+  const [sellTicketOpen, setSellTicketOpen] = useState(false);
   const refPrices = useNftReferrerPriceMap();
   const refPricesUsd = useNftReferrerPriceUsdMap();
   const [display, setDisplay] = useState(listing);
@@ -191,7 +233,162 @@ const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onTrade,
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }, [index, siblings]);
 
-  const assetReady = nftListingToAsset(pricedRow, Math.max(priceUsd, 1));
+  // Сброс количества при переключении на другой NFT (иначе можно случайно
+  // продать/купить не тот объём, оставшийся от предыдущей карточки).
+  useEffect(() => {
+    setQtyBuyStr('1');
+    setQtySellStr('1');
+    setTradeTab('buy');
+  }, [nftSpotTicker]);
+
+  const balance = Number(user?.balance ?? 0);
+  const currentHolding = spotHoldings.find((h) => h.ticker === nftSpotTicker);
+  const holdingAmount = currentHolding?.amount ?? 0;
+
+  const duoForTicker = !!duoByTicker[nftSpotTicker];
+  const duoCollectionTotal = useMemo(() => {
+    if (!duoForTicker) return 0;
+    const tickers = new Set(siblings.map((s) => nftTickerForListing(s)));
+    let total = 0;
+    for (const h of spotHoldings) if (tickers.has(h.ticker)) total += h.amount ?? 0;
+    return total;
+  }, [duoForTicker, siblings, spotHoldings]);
+  const duoMaxSellQty = duoForTicker ? Math.max(0, Math.floor(duoCollectionTotal - 1 + 1e-9)) : Number.POSITIVE_INFINITY;
+  const duoSellBlocked = duoForTicker && duoMaxSellQty < 1;
+
+  const buyCalc = nftSpotBuyTotals(priceUsd, balance, qtyBuyStr, convertToUsd(MIN_DEAL_USD));
+
+  const sellWholeMaxRaw = holdingAmount <= 0.01 ? 0 : Math.floor(holdingAmount + 0.01);
+  const sellWholeMax = Math.min(sellWholeMaxRaw, duoForTicker ? duoMaxSellQty : sellWholeMaxRaw);
+  const { rawWish: sellRawWish, committedWish: sellCommittedWish } = nftSellWishFromUi(qtySellStr, sellWholeMax);
+  const sellValid =
+    priceUsd > 0 &&
+    sellWholeMax >= 1 &&
+    sellRawWish >= 1 &&
+    sellRawWish <= sellWholeMax &&
+    qtySellStr.replace(/\D/g, '') !== '' &&
+    !duoSellBlocked;
+  const sellProceedsUsd = sellCommittedWish > 0 && priceUsd > 0 ? Math.round(sellCommittedWish * priceUsd * 10000) / 10000 : 0;
+
+  const afterTrade = useCallback(() => {
+    onSpotComplete?.();
+    void refreshUser();
+  }, [onSpotComplete, refreshUser]);
+
+  const handleMarketBuy = useCallback(async () => {
+    if (!user) { toast.show(tr('nft_buy_login', 'Войдите, чтобы купить'), 'error'); return; }
+    if (buying) return;
+    if (!buyCalc.affordable) {
+      toast.show(
+        buyCalc.maxAffordableQty > 0
+          ? t('nft_trade_qty_max', { max: buyCalc.maxAffordableQty })
+          : tr('insufficient_balance', 'Недостаточно средств'),
+        'error',
+      );
+      return;
+    }
+    setBuying(true);
+    Haptic.medium();
+    try {
+      const res = await spotBuy(user.user_id, nftSpotTicker, buyCalc.amountUsd, priceUsd);
+      if (res.ok) {
+        Haptic.success();
+        toast.show(tr('deal_created', 'Готово'), 'success');
+        setQtyBuyStr('1');
+        afterTrade();
+      } else {
+        toast.show(nftTradeErrorText(res.error, tr), 'error');
+      }
+    } finally {
+      setBuying(false);
+    }
+  }, [user, buying, buyCalc, toast, tr, t, nftSpotTicker, priceUsd, afterTrade]);
+
+  const submitBuyOrder = useCallback(async (price: number) => {
+    if (!user || buying) return;
+    setBuying(true);
+    try {
+      const { alreadyPlaced } = await placeNftOrder({
+        userId: user.user_id,
+        side: 'buy',
+        ticker: nftSpotTicker,
+        quantity: buyCalc.qtyWish,
+        collectionName: display.collectionName,
+        nftCode: display.codeKey,
+        imageUrl: display.imageUrl,
+        priceUsd: price,
+      });
+      setBuyTicketOpen(false);
+      Haptic.success();
+      toast.show(
+        alreadyPlaced
+          ? tr('nft_order_already_placed', 'У вас уже есть размещённый ордер на этот NFT — ожидает подтверждения.')
+          : tr('nft_buy_order_sent', 'Заявка отправлена продавцу. Ожидайте подтверждения.'),
+        'success',
+      );
+    } catch (err) {
+      const code = err instanceof Error ? err.message : '';
+      toast.show(nftTradeErrorText(code, tr), 'error');
+    } finally {
+      setBuying(false);
+    }
+  }, [user, buying, nftSpotTicker, buyCalc.qtyWish, display.collectionName, display.codeKey, display.imageUrl, toast, tr]);
+
+  const handleMarketSell = useCallback(async () => {
+    if (!user) { toast.show(tr('nft_buy_login', 'Войдите'), 'error'); return; }
+    if (selling) return;
+    if (!sellValid) {
+      toast.show(duoSellBlocked ? tr('nft_sell_duo_pair_required', 'Нужна пара: нельзя продать последний NFT коллекции') : tr('insufficient_balance', 'Недостаточно средств'), 'error');
+      return;
+    }
+    setSelling(true);
+    Haptic.medium();
+    try {
+      const res = await sellNftMarket({ userId: user.user_id, ticker: nftSpotTicker, quantity: sellCommittedWish, priceUsd });
+      if (res.ok) {
+        Haptic.success();
+        toast.show(`${tr('nft_sold_ok', 'Продано')} · +$${(res.amountUsd ?? 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`, 'success');
+        setQtySellStr('1');
+        afterTrade();
+      } else {
+        toast.show(nftTradeErrorText(res.error, tr), 'error');
+      }
+    } finally {
+      setSelling(false);
+    }
+  }, [user, selling, sellValid, duoSellBlocked, toast, tr, nftSpotTicker, sellCommittedWish, priceUsd, afterTrade]);
+
+  const submitSellOrder = useCallback(async (price: number) => {
+    if (!user || selling) return;
+    setSelling(true);
+    try {
+      const { alreadyPlaced } = await placeNftOrder({
+        userId: user.user_id,
+        side: 'sell',
+        ticker: nftSpotTicker,
+        quantity: sellCommittedWish,
+        collectionName: display.collectionName,
+        nftCode: display.codeKey,
+        imageUrl: display.imageUrl,
+        priceUsd: price,
+      });
+      setSellTicketOpen(false);
+      Haptic.success();
+      toast.show(
+        alreadyPlaced
+          ? tr('nft_order_already_placed', 'У вас уже есть размещённый ордер на этот NFT — ожидает подтверждения.')
+          : tr('nft_sell_order_sent', 'Заявка на продажу отправлена. Ожидайте подтверждения.'),
+        'success',
+      );
+      afterTrade();
+    } catch (err) {
+      const code = err instanceof Error ? err.message : '';
+      toast.show(nftTradeErrorText(code, tr), 'error');
+    } finally {
+      setSelling(false);
+    }
+  }, [user, selling, nftSpotTicker, sellCommittedWish, display.collectionName, display.codeKey, display.imageUrl, toast, tr, afterTrade]);
+
   const nftCardUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
     const url = new URL(window.location.href);
@@ -248,6 +445,7 @@ const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onTrade,
   }, [nftCardUrl, toast, t]);
 
   return (
+    <>
     <div className="flex flex-col min-h-[100dvh] bg-background animate-fade-in relative overflow-x-hidden">
       <header className={`${APP_TOP_BAR_CLASS} z-[35] sticky top-0 bg-background/95 backdrop-blur-md border-b border-border`} style={APP_TOP_BAR_STYLE}>
         <div className={`${APP_TOP_BAR_ROW} max-w-[720px] mx-auto`}>
@@ -347,17 +545,10 @@ const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onTrade,
               <div className="flex items-center gap-3 w-full">
                 <button
                   type="button"
-                  onClick={() => { Haptic.medium(); onTrade(assetReady); }}
-                  className="app-button-primary flex-1 text-[15px]"
-                >
-                  {t('nft_trade_cta') || 'Buy now'}
-                </button>
-                <button
-                  type="button"
                   onClick={handleCopyLink}
-                  className="h-11 shrink-0 rounded-xl border border-border bg-surface px-3 text-[13px] font-semibold text-textPrimary transition-all active:scale-95"
+                  className="h-11 flex-1 rounded-xl border border-border bg-surface px-3 text-[13px] font-semibold text-textPrimary transition-all active:scale-95"
                 >
-                  <span className="flex items-center gap-2">
+                  <span className="flex items-center justify-center gap-2">
                     {copiedLink ? <Check size={18} /> : <Copy size={18} />}
                     {copiedLink ? tr('deposit_copy_success', 'Скопировано') : tr('nft_copy_link', 'Скопировать ссылку')}
                   </span>
@@ -372,6 +563,173 @@ const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onTrade,
                   <MessageCircle size={20} />
                 </button>
               </div>
+            </div>
+
+            {/* Единая покупка/продажа — вся торговля этим NFT происходит здесь,
+                без перехода на отдельную полноэкранную страницу. */}
+            <div className="app-border rounded-xl p-5 space-y-4 bg-surface">
+              <div className="flex gap-1 p-1 rounded-full bg-surfaceElevated">
+                <button
+                  type="button"
+                  onClick={() => { Haptic.tap(); setTradeTab('buy'); }}
+                  className={`flex-1 py-2.5 rounded-full text-[13px] font-bold transition-colors ${
+                    tradeTab === 'buy' ? 'bg-up text-black' : 'text-textSubtle hover:text-textPrimary'
+                  }`}
+                >
+                  {tr('nft_buy_cta', 'Купить')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { Haptic.tap(); setTradeTab('sell'); }}
+                  className={`flex-1 py-2.5 rounded-full text-[13px] font-bold transition-colors ${
+                    tradeTab === 'sell' ? 'bg-red-500 text-white' : 'text-textSubtle hover:text-textPrimary'
+                  }`}
+                >
+                  {tr('nft_sell', 'Продать')}
+                </button>
+              </div>
+
+              {tradeTab === 'buy' ? (
+                <>
+                  <div className="flex gap-1 p-1 rounded-full bg-surfaceElevated">
+                    {(['market', 'order'] as const).map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => { Haptic.tap(); setBuyKind(k); }}
+                        className={`flex-1 py-2 rounded-full text-[12px] font-semibold transition-colors ${
+                          buyKind === k ? 'bg-up/15 text-up' : 'text-textSubtle hover:text-textPrimary'
+                        }`}
+                      >
+                        {k === 'market' ? tr('nft_kind_market', 'Рыночная') : tr('nft_kind_order', 'Ордерная')}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-textMuted uppercase font-bold">{tr('nft_trade_quantity', 'Количество')}</label>
+                    <div className="flex w-full max-w-[15rem] items-stretch overflow-hidden rounded-xl bg-surfaceElevated">
+                      <button
+                        type="button"
+                        onClick={() => { Haptic.tap(); setQtyBuyStr((prev) => String(Math.max(1, parseDiscreteNftQtyString(prev, 1) - 1))); }}
+                        className="flex min-h-[2.75rem] min-w-[2.75rem] flex-1 items-center justify-center text-textPrimary transition-colors hover:bg-white/[0.07] border-r border-border"
+                      >
+                        <Minus size={18} className="text-down" />
+                      </button>
+                      <div className="flex min-w-[3.25rem] shrink-0 items-center justify-center bg-black/20 px-4 font-mono text-[15px] font-bold text-textPrimary">
+                        {buyCalc.qtyWish}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { Haptic.tap(); setQtyBuyStr((prev) => String(parseDiscreteNftQtyString(prev, 1) + 1)); }}
+                        className="flex min-h-[2.75rem] min-w-[2.75rem] flex-1 items-center justify-center text-textPrimary transition-colors hover:bg-white/[0.07] border-l border-border"
+                      >
+                        <Plus size={18} className="text-up" />
+                      </button>
+                    </div>
+                    {buyCalc.maxAffordableQty > 0 && (
+                      <p className="text-[10px] text-textMuted">{t('nft_trade_qty_max', { max: buyCalc.maxAffordableQty })}</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between text-[13px]">
+                    <span className="text-textMuted">{tr('nft_trade_buy_note', 'Итого')}</span>
+                    <span className="font-mono font-bold text-up">{priceUsd > 0 ? formatPrice(buyCalc.amountUsd) : '—'} {currencyCode}</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={buyKind === 'market' ? (buying || !buyCalc.affordable) : (buying || priceUsd <= 0)}
+                    onClick={() => {
+                      if (!user) { toast.show(tr('nft_buy_login', 'Войдите, чтобы купить'), 'error'); return; }
+                      Haptic.tap();
+                      if (buyKind === 'market') void handleMarketBuy();
+                      else setBuyTicketOpen(true);
+                    }}
+                    className="w-full h-12 rounded-full font-bold text-base active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-up text-black"
+                  >
+                    {buying
+                      ? '…'
+                      : buyKind === 'market'
+                        ? `${tr('nft_market_buy', 'Купить по рынку')} · ×${buyCalc.qtyWish}`
+                        : tr('nft_order_buy', 'Создать заявку')}
+                  </button>
+                </>
+              ) : holdingAmount > 0 ? (
+                <>
+                  <div className="flex gap-1 p-1 rounded-full bg-surfaceElevated">
+                    {(['market', 'order'] as const).map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => { Haptic.tap(); setSellKind(k); }}
+                        className={`flex-1 py-2 rounded-full text-[12px] font-semibold transition-colors ${
+                          sellKind === k ? 'bg-red-500/15 text-red-400' : 'text-textSubtle hover:text-textPrimary'
+                        }`}
+                      >
+                        {k === 'market' ? tr('nft_kind_market', 'Рыночная') : tr('nft_kind_order', 'Ордерная')}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-textMuted uppercase font-bold">
+                      {tr('nft_trade_quantity', 'Количество')} · {tr('available', 'Доступно')}: {sellWholeMax}
+                    </label>
+                    <div className="flex w-full max-w-[15rem] items-stretch overflow-hidden rounded-xl bg-surfaceElevated">
+                      <button
+                        type="button"
+                        onClick={() => { Haptic.tap(); setQtySellStr((prev) => String(Math.max(1, parseDiscreteNftQtyString(prev, 1) - 1))); }}
+                        disabled={sellWholeMax < 1 || sellRawWish <= 1}
+                        className="flex min-h-[2.75rem] min-w-[2.75rem] flex-1 items-center justify-center text-textPrimary transition-colors hover:bg-white/[0.07] border-r border-border disabled:opacity-30"
+                      >
+                        <Minus size={18} className="text-down" />
+                      </button>
+                      <div className="flex min-w-[3.25rem] shrink-0 items-center justify-center bg-black/20 px-4 font-mono text-[15px] font-bold text-textPrimary">
+                        {sellCommittedWish}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { Haptic.tap(); setQtySellStr((prev) => String(parseDiscreteNftQtyString(prev, 1) + 1)); }}
+                        disabled={sellWholeMax < 1 || sellRawWish >= sellWholeMax}
+                        className="flex min-h-[2.75rem] min-w-[2.75rem] flex-1 items-center justify-center text-textPrimary transition-colors hover:bg-white/[0.07] border-l border-border disabled:opacity-30"
+                      >
+                        <Plus size={18} className="text-up" />
+                      </button>
+                    </div>
+                    {duoSellBlocked && (
+                      <p className="text-[10px] text-amber-400">{tr('nft_sell_duo_pair_required', 'Нужна пара: нельзя продать последний NFT коллекции')}</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between text-[13px]">
+                    <span className="text-textMuted">{tr('you_receive', 'Вы получите')}</span>
+                    <span className="font-mono font-bold text-red-400">{priceUsd > 0 ? formatPrice(sellProceedsUsd) : '—'} {currencyCode}</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={selling || !sellValid}
+                    onClick={() => {
+                      if (!user) { toast.show(tr('nft_buy_login', 'Войдите'), 'error'); return; }
+                      Haptic.tap();
+                      if (sellKind === 'market') void handleMarketSell();
+                      else setSellTicketOpen(true);
+                    }}
+                    className="w-full h-12 rounded-full font-bold text-base active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-red-500 text-white"
+                  >
+                    {selling
+                      ? '…'
+                      : sellKind === 'market'
+                        ? tr('nft_market_sell_cta', 'Продать по рынку')
+                        : tr('nft_order_sell_cta', 'Создать заявку на продажу')}
+                  </button>
+                </>
+              ) : (
+                <p className="py-4 text-center text-[13px] text-textMuted">
+                  {tr('nft_sell_none_owned', 'У вас нет этого NFT — сначала купите его во вкладке «Купить».')}
+                </p>
+              )}
             </div>
 
             {/* Order book */}
@@ -445,6 +803,33 @@ const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onTrade,
       </div>
     </div>
   </div>
+
+  {buyTicketOpen && (
+    <NftOrderTicket
+      mode="buy"
+      nftLabel={`${display.collectionName} #${display.codeDisplay}`}
+      imageUrl={display.imageUrl}
+      defaultPriceUsd={buyCalc.amountUsd}
+      quantity={buyCalc.qtyWish}
+      submitting={buying}
+      onSubmit={(price) => void submitBuyOrder(price)}
+      onClose={() => setBuyTicketOpen(false)}
+    />
+  )}
+
+  {sellTicketOpen && (
+    <NftOrderTicket
+      mode="sell"
+      nftLabel={`${display.collectionName} #${display.codeDisplay}`}
+      imageUrl={display.imageUrl}
+      defaultPriceUsd={sellProceedsUsd}
+      quantity={sellCommittedWish}
+      submitting={selling}
+      onSubmit={(price) => void submitSellOrder(price)}
+      onClose={() => setSellTicketOpen(false)}
+    />
+  )}
+  </>
   );
 };
 

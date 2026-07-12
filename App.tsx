@@ -226,7 +226,12 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     if (typeof window === 'undefined' || nftDeepLinkConsumed.current) return;
-    if (loading) return;
+    // Ждём завершения авторизации: гость видит только Landing/Login/Register
+    // (см. ранний return ниже), поэтому переход применяем ПОСЛЕ логина —
+    // иначе ссылка вида ?ref=...&nft_slug=...&nft_code=... для нового
+    // пользователя терялась бы (эффект сброса состояния для гостя сразу
+    // возвращал currentPage на HOME, см. следующий useEffect).
+    if (loading || !isLoggedIn) return;
     try {
       const p = new URLSearchParams(window.location.search);
       const ns = (p.get('nft_slug') || '').trim().toLowerCase();
@@ -239,7 +244,7 @@ const AppContent: React.FC = () => {
     } catch {
       /* ignore malformed query */
     }
-  }, [loading, navigateTo]);
+  }, [loading, isLoggedIn, navigateTo]);
 
 
 
@@ -609,13 +614,12 @@ const AppContent: React.FC = () => {
             onBack={() => {
               navigateBack('NFT_COLLECTION');
             }}
-            onTrade={(asset) => {
-              handleNavigateToTrading(asset, { tradeType: 'spot', spotAction: 'buy' });
-            }}
             onOpenChat={(ctx) => {
               setNftChatCtx(ctx);
               navigateTo('NFT_CHAT');
             }}
+            spotHoldings={spotHoldings}
+            onSpotComplete={refreshSpotHoldingsAndUser}
           />
         );
       }
@@ -699,6 +703,7 @@ const AppContent: React.FC = () => {
             userId={user?.user_id ?? 0}
             onNavigateToTrading={handleNavigateToTrading}
             onOpenNftHub={() => handleNavigate('NFT')}
+            onOpenNftListing={(slug, codeKey) => navigateTo('NFT_ITEM', null, null, slug, codeKey)}
             onDeposit={() => handleNavigate('DEPOSIT')}
             onWithdraw={() => handleNavigate('WITHDRAW')}
           />
@@ -717,6 +722,7 @@ const AppContent: React.FC = () => {
             onNavigateToKyc={() => navigateTo('KYC')}
             onNavigateToLanguage={() => navigateTo('LANGUAGE')}
             onNavigateToSupport={() => navigateTo('SUPPORT')}
+            onNavigateToNft={() => navigateTo('NFT')}
           />
         );
       case 'KYC':

@@ -26,7 +26,6 @@ import { enrichNftListingRow, useNftReferrerPriceMap, useNftReferrerPriceUsdMap,
 import { fetchActivityHistory } from '../lib/activityHistory';
 import {
   getAllNftListings,
-  nftListingToAsset,
   nftTickerForListing,
   slugifyCollectionName,
   type NftListingRow,
@@ -41,6 +40,8 @@ interface DealsPageProps {
   userId: number;
   onNavigateToTrading: (asset: Asset, options?: NavigateToTradingOptions) => void;
   onOpenNftHub?: () => void;
+  /** Открыть единую страницу покупки/продажи конкретного NFT из каталога. */
+  onOpenNftListing?: (slug: string, codeKey: string) => void;
   onDeposit?: () => void;
   onWithdraw?: () => void;
 }
@@ -49,8 +50,9 @@ type TabId = 'ACTIVE' | 'HISTORY' | 'ASSETS';
 
 type PortfolioNftRow = {
   key: string;
-  source: 'spot' | 'owned';
-  asset: Asset;
+  /** Есть каталожный листинг — строку открываем на единой странице NFT. Нет — в «Мои NFT» (уникальный, созданный пользователем предмет). */
+  catalogSlug: string | null;
+  catalogCodeKey: string | null;
   collectionName: string;
   codeDisplay: string;
   imageUrl?: string | null;
@@ -102,6 +104,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
   userId,
   onNavigateToTrading,
   onOpenNftHub,
+  onOpenNftListing,
   onDeposit,
   onWithdraw,
 }) => {
@@ -150,77 +153,86 @@ const DealsPage: React.FC<DealsPageProps> = ({
     };
   }, [userId]);
 
+  // Единое владение (миграция 020): все NFT — из nft_owned, без дублей.
+  // spot_holdings теперь тоже отражает эти же предметы (для обратной
+  // совместимости старых RPC), поэтому источником для Портфель-секции
+  // NFT берём ИСКЛЮЧИТЕЛЬНО nft_owned — иначе каждый предмет считался бы
+  // дважды (и как spot-строка, и как owned-строка).
+  const ownedActive = useMemo(() => ownedNfts.filter((row) => row.status !== 'sold'), [ownedNfts]);
+
+  /** Каталожные предметы группируем по тикеру (кол-во копий), созданные пользователем — по одному ряду. */
+  const ownedGrouped = useMemo(() => {
+    const catalogGroups = new Map<string, { listing: NftListingRow; count: number }>();
+    const customRows: NftOwnedRow[] = [];
+    const tickers = new Set<string>();
+    for (const row of ownedActive) {
+      const synthetic = ownedNftToListing(row);
+      const ticker = nftTickerForListing(synthetic);
+      tickers.add(ticker);
+      const catalogRow = nftListingBySpotTicker.get(ticker);
+      if (catalogRow) {
+        const existing = catalogGroups.get(ticker);
+        if (existing) existing.count += 1;
+        else catalogGroups.set(ticker, { listing: catalogRow, count: 1 });
+      } else {
+        customRows.push(row);
+      }
+    }
+    return { catalogGroups, customRows, tickers };
+  }, [ownedActive, nftListingBySpotTicker]);
+
   const nftPortfolioRows = useMemo<PortfolioNftRow[]>(() => {
-    const spotNftRows: PortfolioNftRow[] = spotHoldings
-      .map((h) => {
-        if ((h.amount ?? 0) <= 1e-6) return null;
-        const row = nftListingBySpotTicker.get(h.ticker);
-        if (!row) return null;
-        const live = assetsByTicker[h.ticker];
-        const rowPriced = enrichNftListingRow(row, refNftPriceMap, jitter, refNftPriceUsdMap);
-        const baseUsd =
-          ethUsdNft > 0
-            ? rowPriced.priceEth * ethUsdNft
-            : Math.max(h.avgPriceUsd ?? 0, rowPriced.priceEth * 3_200, live?.price ?? 0, 1);
-        const priceUsd =
-          Number.isFinite(baseUsd) && baseUsd > 0
-            ? withNftDisplayWobbleUsd(baseUsd, h.ticker, now)
-            : Math.max(h.avgPriceUsd ?? 0, 1);
-        const asset = nftListingToAsset(rowPriced, Math.max(priceUsd, 1));
-        const valueUsd = (h.amount ?? 0) * (priceUsd > 0 ? priceUsd : h.avgPriceUsd ?? 0);
-        const qtyRounded = Math.round((h.amount ?? 0) * 1000) / 1000;
-        const quantityLabel =
-          Math.abs(qtyRounded - Math.floor(qtyRounded + 1e-9)) < 1e-6
-            ? String(Math.floor(qtyRounded + 1e-9))
-            : qtyRounded.toFixed(3).replace(/\.?0+$/, '');
-        return {
-          key: `spot-${h.ticker}`,
-          source: 'spot' as const,
-          asset,
-          collectionName: row.collectionName,
-          codeDisplay: row.codeDisplay,
-          imageUrl: row.imageUrl,
-          quantityLabel,
-          price: priceUsd || h.avgPriceUsd,
-          valueUsd,
-          statusLabel: 'Спот',
-          statusTone: 'market' as const,
-          subtitle: t('portfolio_units_label'),
-        };
-      })
-      .filter((r): r is NonNullable<typeof r> => r != null)
-      .filter((r) => Number.isFinite(r.valueUsd));
-    const ownedRows: PortfolioNftRow[] = ownedNfts
-      .filter((row) => row.status !== 'sold')
-      .map((row) => {
-        const meta = nftOwnedStatusMeta(row.status);
-        const listing = ownedNftToListing(row);
-        const price = Number(row.list_price_usd ?? row.acquired_price_usd ?? listing.customPriceUsd ?? 0);
-        const priceSafe = Number.isFinite(price) && price > 0 ? price : 1;
-        const asset = nftListingToAsset(listing, priceSafe);
-        return {
-          key: `owned-${row.id}`,
-          source: 'owned' as const,
-          asset,
-          collectionName: listing.collectionName,
-          codeDisplay: listing.codeDisplay,
-          imageUrl: listing.imageUrl,
-          quantityLabel: '1',
-          price: priceSafe,
-          valueUsd: priceSafe,
-          statusLabel: meta.label,
-          statusTone: meta.tone,
-          subtitle: row.is_user_created ? 'Создан вами' : meta.detail,
-        };
-      });
-    const rows = [...spotNftRows, ...ownedRows];
+    const catalogRows: PortfolioNftRow[] = Array.from(ownedGrouped.catalogGroups.entries()).map(([ticker, { listing: row, count }]) => {
+      const live = assetsByTicker[ticker];
+      const rowPriced = enrichNftListingRow(row, refNftPriceMap, jitter, refNftPriceUsdMap);
+      const baseUsd =
+        ethUsdNft > 0
+          ? rowPriced.priceEth * ethUsdNft
+          : Math.max(rowPriced.priceEth * 3_200, live?.price ?? 0, 1);
+      const priceUsd = Number.isFinite(baseUsd) && baseUsd > 0 ? withNftDisplayWobbleUsd(baseUsd, ticker, now) : 1;
+      return {
+        key: `catalog-${ticker}`,
+        catalogSlug: row.collectionSlug,
+        catalogCodeKey: row.codeKey,
+        collectionName: row.collectionName,
+        codeDisplay: row.codeDisplay,
+        imageUrl: row.imageUrl,
+        quantityLabel: String(count),
+        price: priceUsd,
+        valueUsd: priceUsd * count,
+        statusLabel: 'В портфеле',
+        statusTone: 'market' as const,
+        subtitle: t('portfolio_units_label'),
+      };
+    });
+    const customRows: PortfolioNftRow[] = ownedGrouped.customRows.map((row) => {
+      const meta = nftOwnedStatusMeta(row.status);
+      const listing = ownedNftToListing(row);
+      const price = Number(row.list_price_usd ?? row.acquired_price_usd ?? listing.customPriceUsd ?? 0);
+      const priceSafe = Number.isFinite(price) && price > 0 ? price : 1;
+      return {
+        key: `owned-${row.id}`,
+        catalogSlug: null,
+        catalogCodeKey: null,
+        collectionName: listing.collectionName,
+        codeDisplay: listing.codeDisplay,
+        imageUrl: listing.imageUrl,
+        quantityLabel: '1',
+        price: priceSafe,
+        valueUsd: priceSafe,
+        statusLabel: meta.label,
+        statusTone: meta.tone,
+        subtitle: row.is_user_created ? 'Создан вами' : meta.detail,
+      };
+    });
+    const rows = [...catalogRows, ...customRows];
     rows.sort((a, b) => b.valueUsd - a.valueUsd);
     return rows;
-  }, [spotHoldings, ownedNfts, assetsByTicker, nftListingBySpotTicker, now, ethUsdNft, refNftPriceMap, refNftPriceUsdMap, jitter, t]);
+  }, [ownedGrouped, assetsByTicker, now, ethUsdNft, refNftPriceMap, refNftPriceUsdMap, jitter, t]);
 
   const spotRows = useMemo(() => {
     const rows = spotHoldings
-      .filter((h) => !nftListingBySpotTicker.has(h.ticker))
+      .filter((h) => !nftListingBySpotTicker.has(h.ticker) && !ownedGrouped.tickers.has(h.ticker))
       .map((h) => {
         const live = assetsByTicker[h.ticker];
         const price = live?.price ?? h.avgPriceUsd ?? 0;
@@ -241,7 +253,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
       .filter((r) => Number.isFinite(r.valueUsd));
     rows.sort((a, b) => b.valueUsd - a.valueUsd);
     return rows;
-  }, [spotHoldings, assetsByTicker, nftListingBySpotTicker]);
+  }, [spotHoldings, assetsByTicker, nftListingBySpotTicker, ownedGrouped.tickers]);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -697,17 +709,21 @@ const DealsPage: React.FC<DealsPageProps> = ({
                     </div>
                   ) : (
                     <div className="rounded-xl overflow-hidden bg-surfaceElevated divide-y divide-border">
-                      {nftPortfolioRows.map(({ key, source, asset, collectionName, codeDisplay, imageUrl, quantityLabel, price, valueUsd, statusLabel, statusTone, subtitle }) => {
+                      {nftPortfolioRows.map(({ key, catalogSlug, catalogCodeKey, collectionName, codeDisplay, imageUrl, quantityLabel, price, valueUsd, statusLabel, statusTone, subtitle }) => {
+                        const hasCatalogPage = Boolean(catalogSlug && catalogCodeKey && onOpenNftListing);
                         return (
                           <button
                             key={key}
                             type="button"
                             onClick={() => {
                               Haptic.tap();
-                              if (source === 'owned') {
-                                onOpenNftHub?.();
+                              // Единая страница: карточка каталога открывает NFTDetailPage
+                              // (там же покупка/продажа); уникальные предметы без каталога
+                              // (созданные пользователем) — управление в «Мои NFT».
+                              if (hasCatalogPage) {
+                                onOpenNftListing!(catalogSlug!, catalogCodeKey!);
                               } else {
-                                onNavigateToTrading(asset, { tradeType: 'spot', spotAction: 'sell' });
+                                onOpenNftHub?.();
                               }
                             }}
                             className="w-full text-left px-3 py-3 flex items-center gap-3 min-h-[64px] active:bg-white/[0.04] hover:bg-white/[0.03] transition-all duration-200 cursor-pointer"
@@ -739,7 +755,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
                               <p className="text-[11px] text-textMuted font-mono mt-0.5 tabular-nums">
                                 {quantityLabel} {t('portfolio_units_label')} · {price > 0 ? formatPrice(price) : '—'} {symbol}
                               </p>
-                              {source === 'owned' && (
+                              {!hasCatalogPage && (
                                 <p className="text-[10px] text-textMuted mt-0.5 truncate">{subtitle}</p>
                               )}
                             </div>

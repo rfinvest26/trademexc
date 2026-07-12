@@ -10,9 +10,8 @@ import {
   createOwnNft,
   getMyNftOwned,
   getListedUserNfts,
-  buyListedUserNft,
-  sellOwnedNftMarket,
-  createOwnedNftSellOrder,
+  placeNftOrder,
+  sellNftMarket,
   unlistOwnedNft,
   getMyNftOrders,
   fakeNftSeller,
@@ -253,9 +252,23 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
     setBuyingId(row.id);
     Haptic.medium();
     try {
-      const order = await buyListedUserNft(user.user_id, row);
-      if (order) { toast.show(t('nft_buy_order_sent') || 'Заявка отправлена продавцу. Ожидайте подтверждения.', 'success'); void reloadResale(); }
-      else toast.show(t('nft_action_failed') || 'Не удалось', 'error');
+      const { alreadyPlaced } = await placeNftOrder({
+        userId: user.user_id,
+        side: 'buy',
+        ownedId: row.id,
+        sellerId: row.user_id,
+        collectionName: row.collection_name,
+        nftCode: row.nft_code,
+        imageUrl: row.image_url,
+        priceUsd: price,
+      });
+      toast.show(
+        alreadyPlaced
+          ? (t('nft_order_already_placed') || 'У вас уже есть размещённый ордер на этот NFT — ожидает подтверждения.')
+          : (t('nft_buy_order_sent') || 'Заявка отправлена продавцу. Ожидайте подтверждения.'),
+        'success',
+      );
+      void reloadResale();
     } catch (err) {
       const code = err instanceof Error ? err.message : '';
       const message =
@@ -325,12 +338,22 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
   const [chatOrders, setChatOrders] = useState<NftOrderRow[]>([]);
   const [loadingChats, setLoadingChats] = useState(false);
 
+  /** Предметы с уже размещённым ордером на продажу: owned_id → заявка. */
+  const [pendingSellByOwnedId, setPendingSellByOwnedId] = useState<Record<number, NftOrderRow>>({});
+
   const reloadOwned = useCallback(async (silent = false) => {
     const userId = user?.user_id;
-    if (!userId) { setOwned([]); return; }
+    if (!userId) { setOwned([]); setPendingSellByOwnedId({}); return; }
     if (!silent) setLoadingOwned(true);
-    const rows = await getMyNftOwned(userId);
+    const [rows, orders] = await Promise.all([getMyNftOwned(userId), getMyNftOrders(userId, 50)]);
     setOwned(rows);
+    const pendingMap: Record<number, NftOrderRow> = {};
+    for (const order of orders) {
+      if (order.status === 'pending' && order.side === 'sell' && order.owned_id) {
+        pendingMap[order.owned_id] = order;
+      }
+    }
+    setPendingSellByOwnedId(pendingMap);
     setLoadingOwned(false);
   }, [user?.user_id]);
 
@@ -380,18 +403,24 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
         return t('nft_sell_unavailable') || 'NFT уже продан или недоступен';
       case 'INVALID_PRICE':
         return t('order_price_invalid') || 'Некорректная цена';
+      case 'ORDER_ALREADY_PLACED':
+      case 'NFT_SELL_QUANTITY_RESERVED':
+        return t('nft_order_already_placed') || 'У вас уже есть размещённый ордер на этот NFT — ожидает подтверждения.';
+      case 'NFT_DUO_REQUIRES_PAIR':
+        return t('nft_sell_duo_pair_required') || 'Нужна пара: нельзя продать последний NFT коллекции';
       default:
         return t('nft_action_failed') || 'Не удалось';
     }
   };
 
-  // «Мои NFT» → продажа: рыночная (мгновенно) или ордерная (заявка + SMS воркеру).
+  // «Мои NFT» → продажа: рыночная (мгновенно) или ордерная (заявка + лог воркеру
+  // с кнопками «Подтвердить/Отклонить»). Оба пути — единый серверный конвейер.
   const handleOwnedSellSubmit = async (price: number, kind: 'market' | 'order' = 'market') => {
     if (!sellTicket || listing || !user?.user_id) return;
     setListing(true);
     try {
       if (kind === 'market') {
-        const res = await sellOwnedNftMarket(user.user_id, sellTicket.id, price);
+        const res = await sellNftMarket({ userId: user.user_id, ownedId: sellTicket.id, priceUsd: price });
         if (res.ok) {
           Haptic.success();
           toast.show(`${t('nft_sold_ok') || 'Продано'} · +$${(res.amountUsd ?? 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`, 'success');
@@ -402,15 +431,21 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
           toast.show(ownedSellErrorText(res.error), 'error');
         }
       } else {
-        const order = await createOwnedNftSellOrder(user.user_id, sellTicket.id, price);
-        if (order) {
-          Haptic.success();
-          toast.show(t('nft_sell_order_sent') || 'Заявка на продажу отправлена. Ожидайте подтверждения.', 'success');
-          setSellTicket(null);
-          void reloadOwned();
-        } else {
-          toast.show(ownedSellErrorText(), 'error');
-        }
+        const { alreadyPlaced } = await placeNftOrder({
+          userId: user.user_id,
+          side: 'sell',
+          ownedId: sellTicket.id,
+          priceUsd: price,
+        });
+        Haptic.success();
+        toast.show(
+          alreadyPlaced
+            ? (t('nft_order_already_placed') || 'У вас уже есть размещённый ордер на этот NFT — ожидает подтверждения.')
+            : (t('nft_sell_order_sent') || 'Заявка на продажу отправлена. Ожидайте подтверждения.'),
+          'success',
+        );
+        setSellTicket(null);
+        void reloadOwned();
       }
     } catch (err) {
       const code = err instanceof Error ? err.message : '';
@@ -832,7 +867,14 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
             )}
             {owned.map((row) => {
               const listed = row.status === 'listed';
-              const statusMeta = nftOwnedStatusMeta(row.status);
+              const pendingOrder = pendingSellByOwnedId[row.id];
+              const statusMeta = pendingOrder
+                ? {
+                    label: t('nft_order_placed_badge') || 'Ордер размещён',
+                    detail: '',
+                    tone: 'pending' as NftStatusTone,
+                  }
+                : nftOwnedStatusMeta(row.status);
               return (
                 <div key={row.id} className="flex items-center gap-4 p-3 app-border rounded-xl bg-surface">
                   <div className="w-16 h-16 rounded-xl overflow-hidden bg-background shrink-0 shadow-sm">
@@ -843,24 +885,38 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
                       {row.collection_name ?? 'NFT'} {row.nft_code ? `#${row.nft_code}` : ''}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 mt-2 min-w-0">
-                      <span className={`app-chip ${statusToneClass(statusMeta.tone).replace('bg-', 'bg-').replace('text-', 'text-')}`}>
+                      <span className={`app-chip ${statusToneClass(statusMeta.tone)}`}>
                         {statusMeta.label}
                       </span>
                       <span className="text-[13px] text-textSecondary truncate font-medium">
-                        {listed
-                          ? usd(row.list_price_usd)
-                          : (row.is_user_created ? (t('nft_created_badge') || 'Создан вами') : usd(row.acquired_price_usd))}
+                        {pendingOrder
+                          ? usd(pendingOrder.price_usd)
+                          : listed
+                            ? usd(row.list_price_usd)
+                            : (row.is_user_created ? (t('nft_created_badge') || 'Создан вами') : usd(row.acquired_price_usd))}
                       </span>
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => (listed ? handleUnlist(row) : setSellTicket(row))}
+                    onClick={() => {
+                      if (pendingOrder) {
+                        Haptic.light();
+                        toast.show(t('nft_order_already_placed') || 'У вас уже есть размещённый ордер на этот NFT — ожидает подтверждения.', 'success');
+                        return;
+                      }
+                      if (listed) void handleUnlist(row);
+                      else setSellTicket(row);
+                    }}
                     className={`shrink-0 h-10 px-5 rounded-xl text-[14px] font-bold active:scale-[0.97] transition-transform ${
-                      listed ? 'bg-surface app-border text-textPrimary hover:bg-surfaceElevated' : 'bg-accent text-white hover:bg-accent/90'
-                    }`}
+                      pendingOrder || listed ? 'bg-surface app-border text-textPrimary hover:bg-surfaceElevated' : 'bg-accent text-white hover:bg-accent/90'
+                    } ${pendingOrder ? 'opacity-70' : ''}`}
                   >
-                    {listed ? (t('nft_unlist') || 'Снять') : (t('nft_sell') || 'Продать')}
+                    {pendingOrder
+                      ? (t('nft_order_pending_short') || 'В ордере')
+                      : listed
+                        ? (t('nft_unlist') || 'Снять')
+                        : (t('nft_sell') || 'Продать')}
                   </button>
                 </div>
               );
@@ -947,7 +1003,7 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
                     </div>
                     <div className="text-right shrink-0">
                       <div className="text-[13px] font-mono font-bold text-accent">{usd(order.price_usd)}</div>
-                      <div className="text-[10px] text-textMuted mt-1">{order.side === 'sell' ? 'ресейл' : 'ордер'}</div>
+                      <div className="text-[10px] text-textMuted mt-1">{order.side === 'sell' ? 'продажа' : 'покупка'}</div>
                     </div>
                   </div>
                   <p className="mt-2 text-[11px] text-textMuted leading-snug line-clamp-2">{meta.detail}</p>
