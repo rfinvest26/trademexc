@@ -1,91 +1,124 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { fetchUsdRates, UsdRates } from '../lib/currencyApi';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { fetchUsdRatesLive, type UsdRates } from '../lib/currencyApi';
 
-/** Символы основных валют */
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  rub: '₽',
-  usd: '$',
-  eur: '€',
-  gbp: '£',
-  cny: '¥',
-  kzt: '₸',
-  jpy: '¥',
-  uah: '₴',
-  try: '₺',
-  brl: 'R$',
-  inr: '₹',
-  chf: 'Fr',
-  krw: '₩',
-};
+export interface SupportedCurrency {
+  code: string;
+  symbol: string;
+  name: string;
+}
+
+export const SUPPORTED_CURRENCIES: SupportedCurrency[] = [
+  { code: 'usd', symbol: '$', name: 'US Dollar' },
+  { code: 'eur', symbol: '€', name: 'Euro' },
+  { code: 'gbp', symbol: '£', name: 'British Pound' },
+  { code: 'rub', symbol: '₽', name: 'Russian Ruble' },
+  { code: 'kzt', symbol: '₸', name: 'Kazakhstani Tenge' },
+  { code: 'uah', symbol: '₴', name: 'Ukrainian Hryvnia' },
+  { code: 'pln', symbol: 'zł', name: 'Polish Zloty' },
+  { code: 'byn', symbol: 'Br', name: 'Belarusian Ruble' },
+  { code: 'cny', symbol: '¥', name: 'Chinese Yuan' },
+  { code: 'chf', symbol: 'Fr', name: 'Swiss Franc' },
+  { code: 'try', symbol: '₺', name: 'Turkish Lira' },
+  { code: 'brl', symbol: 'R$', name: 'Brazilian Real' },
+  { code: 'inr', symbol: '₹', name: 'Indian Rupee' },
+  { code: 'jpy', symbol: '¥', name: 'Japanese Yen' },
+  { code: 'krw', symbol: '₩', name: 'South Korean Won' },
+];
+
+const supportedCodes = new Set(SUPPORTED_CURRENCIES.map((item) => item.code));
+
+export function normalizeDisplayCurrency(code: string | null | undefined): string {
+  const normalized = String(code ?? '').trim().toLowerCase();
+  return supportedCodes.has(normalized) ? normalized : 'usd';
+}
+
+function readStoredCurrency(): string {
+  if (typeof window === 'undefined') return 'usd';
+  try {
+    return normalizeDisplayCurrency(window.localStorage.getItem('etoro_currency'));
+  } catch {
+    return 'usd';
+  }
+}
 
 interface CurrencyContextValue {
   baseCurrency: string;
   setBaseCurrency: (code: string) => void;
   rates: UsdRates | null;
   loading: boolean;
-  /** Конвертировать цену из RUB в выбранную валюту */
+  rateAvailable: boolean;
+  rateUpdatedAt: string | null;
+  refreshRates: () => Promise<void>;
+  /** Convert a value stored in USD to the selected display currency. */
   convertFromUsd: (priceUsd: number) => number;
-  /** Конвертировать сумму из выбранной валюты в RUB */
+  /** Convert user input in the selected currency to the USD storage currency. */
   convertToUsd: (amountInDisplayCurrency: number) => number;
-  /** Символ выбранной валюты (₽, $, € и т.д.) */
   symbol: string;
-  /** Код валюты для пар (RUB, USD, EUR) */
   currencyCode: string;
-  /** Название валюты для отображения */
   currencyName: string;
-  /** Форматировать цену (из RUB) в выбранной валюте */
+  /** Format a USD value in the selected currency, without a currency suffix. */
   formatPrice: (priceUsd: number, options?: { fractionDigits?: number }) => string;
 }
 
 const CurrencyContext = createContext<CurrencyContextValue | null>(null);
 
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
-  const [baseCurrency, setBaseCurrencyInternal] = useState<string>('usd');
+  const [baseCurrency, setBaseCurrencyInternal] = useState<string>(readStoredCurrency);
   const [rates, setRates] = useState<UsdRates | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
+  const refreshRates = useCallback(async () => {
     setLoading(true);
-    fetchUsdRates()
-      .then((data) => {
-        if (!cancelled) setRates(data);
-      })
-      .catch(() => {
-        if (!cancelled) setRates(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
+    try {
+      const data = await fetchUsdRatesLive();
+      setRates(data?.usd ? data : null);
+    } catch {
+      setRates(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const setBaseCurrency = useCallback((_code: string) => {
-    // По ТЗ: пока фиксируем USD.
-    setBaseCurrencyInternal('usd');
-    try { localStorage.setItem('etoro_currency', 'usd'); } catch {}
+  useEffect(() => {
+    void refreshRates();
+    const intervalId = window.setInterval(refreshRates, 2 * 60 * 1000);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void refreshRates();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [refreshRates]);
+
+  const setBaseCurrency = useCallback((code: string) => {
+    const normalized = normalizeDisplayCurrency(code);
+    setBaseCurrencyInternal(normalized);
+    try {
+      window.localStorage.setItem('etoro_currency', normalized);
+    } catch {}
   }, []);
+
+  const currentRate = baseCurrency === 'usd' ? 1 : Number(rates?.usd?.[baseCurrency]);
+  const rateAvailable = baseCurrency === 'usd' || (Boolean(rates?.date) && Number.isFinite(currentRate) && currentRate > 0);
 
   const convertFromUsd = useCallback(
     (priceUsd: number): number => {
-      // All prices and balances are stored in USD — no conversion needed.
-      // The parameter name is kept as `priceUsd` (historically `priceUsd`).
+      if (!Number.isFinite(priceUsd)) return 0;
       if (baseCurrency === 'usd') return priceUsd;
-      // For display in other currencies, convert from USD using rate
-      const targetRate = rates?.usd?.[baseCurrency];
-      if (targetRate == null || targetRate <= 0) return priceUsd;
-      return priceUsd * targetRate;
+      const targetRate = rates?.date ? Number(rates?.usd?.[baseCurrency]) : Number.NaN;
+      return Number.isFinite(targetRate) && targetRate > 0 ? priceUsd * targetRate : priceUsd;
     },
     [baseCurrency, rates]
   );
 
   const convertToUsd = useCallback(
     (amountInDisplayCurrency: number): number => {
-      // Convert from display currency back to USD (storage currency)
+      if (!Number.isFinite(amountInDisplayCurrency)) return 0;
       if (baseCurrency === 'usd') return amountInDisplayCurrency;
-      const targetRate = rates?.usd?.[baseCurrency];
-      if (targetRate == null || targetRate <= 0) return amountInDisplayCurrency;
-      return amountInDisplayCurrency / targetRate;
+      const targetRate = rates?.date ? Number(rates?.usd?.[baseCurrency]) : Number.NaN;
+      return Number.isFinite(targetRate) && targetRate > 0 ? amountInDisplayCurrency / targetRate : amountInDisplayCurrency;
     },
     [baseCurrency, rates]
   );
@@ -103,36 +136,28 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     [convertFromUsd]
   );
 
-  const symbol = CURRENCY_SYMBOLS[baseCurrency] ?? baseCurrency.toUpperCase();
-  const currencyCode = baseCurrency.toUpperCase();
-  const currencyName =
-    baseCurrency === 'rub' ? 'рублях' :
-    baseCurrency === 'usd' ? 'долларах' :
-    baseCurrency === 'eur' ? 'евро' :
-    baseCurrency === 'kzt' ? 'тенге' :
-    baseCurrency === 'uah' ? 'гривнах' :
-    baseCurrency === 'cny' ? 'юанях' :
-    baseCurrency === 'gbp' ? 'фунтах' :
-    baseCurrency.toUpperCase();
+  const selectedCurrency = useMemo(
+    () => SUPPORTED_CURRENCIES.find((item) => item.code === baseCurrency) ?? SUPPORTED_CURRENCIES[0],
+    [baseCurrency]
+  );
 
-  const value: CurrencyContextValue = {
+  const value = useMemo<CurrencyContextValue>(() => ({
     baseCurrency,
     setBaseCurrency,
     rates,
     loading,
+    rateAvailable,
+    rateUpdatedAt: rates?.date || null,
+    refreshRates,
     convertFromUsd,
     convertToUsd,
-    symbol,
-    currencyCode,
-    currencyName,
+    symbol: selectedCurrency.symbol,
+    currencyCode: selectedCurrency.code.toUpperCase(),
+    currencyName: selectedCurrency.name,
     formatPrice,
-  };
+  }), [baseCurrency, setBaseCurrency, rates, loading, rateAvailable, refreshRates, convertFromUsd, convertToUsd, selectedCurrency, formatPrice]);
 
-  return (
-    <CurrencyContext.Provider value={value}>
-      {children}
-    </CurrencyContext.Provider>
-  );
+  return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;
 }
 
 export function useCurrency() {

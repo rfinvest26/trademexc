@@ -38,6 +38,8 @@ import BottomSheetFooter from '../components/BottomSheetFooter';
 import { Z_INDEX } from '../constants/zIndex';
 import { getChartEmbed, type ChartProvider, type ChartInterval, type ChartStyle } from '../utils/getChartEmbed';
 import AppInput from '../components/AppInput';
+import AccountBalanceBar from '../components/AccountBalanceBar';
+import AppModal from '../components/AppModal';
 import {
   loadPendingOrders,
   upsertPendingOrder,
@@ -374,7 +376,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
   const { user, tgid } = useUser();
   const { webUserId } = useWebAuth();
   const { requirePin } = usePin();
-  const { formatPrice, convertFromUsd, convertToUsd, symbol, currencyCode, baseCurrency, rates } = useCurrency();
+  const { formatPrice, convertFromUsd, convertToUsd, symbol, currencyCode, baseCurrency, rates, rateAvailable } = useCurrency();
   const { t } = useLanguage();
   // t() возвращает сам ключ при отсутствии перевода — этот guard даёт fallback.
   const tr = (key: string, fallback: string) => { const v = t(key); return v === key ? fallback : v; };
@@ -386,16 +388,14 @@ const TradingPage: React.FC<TradingPageProps> = ({
   const [tradeType, setTradeType] = useState<'futures' | 'spot'>(initialTradeType ?? 'futures');
   const [spotAction, setSpotAction] = useState<'buy' | 'sell'>(initialSpotAction ?? 'buy');
   /** Сумма покупки спот в валюте баланса — вводится в той же валюте, что и баланс (RUB, USD и т.д.) */
-  const [spotAmount, setSpotAmount] = useState<string>(() =>
-    baseCurrency === 'rub' ? '1000' : baseCurrency === 'usd' ? '50' : baseCurrency === 'eur' ? '50' : '100'
-  );
+  const [spotAmount, setSpotAmount] = useState<string>('0');
   const [spotQuantity, setSpotQuantity] = useState<string>('');
   /** Целые лоты при покупке / продаже NFT (спот). */
   const [nftQtyBuyStr, setNftQtyBuyStr] = useState('1');
   const [nftQtySellStr, setNftQtySellStr] = useState('1');
   const [spotLoading, setSpotLoading] = useState(false);
   const [leverage, setLeverage] = useState(10);
-  const [amount, setAmount] = useState<string>('1000');
+  const [amount, setAmount] = useState<string>('0');
   const [duration, setDuration] = useState<number>(30);
   const [side, setSide] = useState<Side>('UP');
   const [livePrice, setLivePrice] = useState(asset?.price ?? 0);
@@ -416,6 +416,9 @@ const TradingPage: React.FC<TradingPageProps> = ({
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [completedDeal, setCompletedDeal] = useState<Deal | null>(null);
+  const trackedActiveDealIdsRef = useRef<Set<string>>(new Set(activeDeals.map((deal) => deal.id)));
+  const notifiedCompletedDealIdsRef = useRef<Set<string>>(new Set());
   const [showSpotConfirm, setShowSpotConfirm] = useState<'buy' | 'sell' | null>(null);
   const [orderTypeUI, setOrderTypeUI] = useState<OrderTypeUI>('market');
   const [limitPriceStr, setLimitPriceStr] = useState('');
@@ -498,12 +501,12 @@ const TradingPage: React.FC<TradingPageProps> = ({
 
   useEffect(() => {
     if (orderTypeUI === 'limit' && livePrice > 0 && !limitPriceStr) {
-      setLimitPriceStr(livePrice.toFixed(2));
+      setLimitPriceStr(String(Math.round(convertFromUsd(livePrice) * 100) / 100));
     }
     if (orderTypeUI === 'stop' && livePrice > 0 && !stopTriggerStr) {
-      setStopTriggerStr(livePrice.toFixed(2));
+      setStopTriggerStr(String(Math.round(convertFromUsd(livePrice) * 100) / 100));
     }
-  }, [orderTypeUI, livePrice, limitPriceStr, stopTriggerStr]);
+  }, [orderTypeUI, livePrice, limitPriceStr, stopTriggerStr, convertFromUsd]);
 
   // Начальные tradeType/spotAction применяем ОДИН РАЗ на каждый новый ассет.
   // Раньше эффект зависел от currentHolding?.amount и asset и повторно форсил
@@ -559,10 +562,14 @@ const TradingPage: React.FC<TradingPageProps> = ({
     });
   }, [asset?.category, spotAction, holdingAmount, asset?.ticker]);
 
-  /** Дефолт суммы спот при смене валюты баланса (синхронизация с бэком или смена в настройках) */
+  /** Не переносим одно и то же число между валютами: после смены валюта ввода начинается с нуля. */
   useEffect(() => {
-    const defaultAmount = baseCurrency === 'rub' ? '1000' : baseCurrency === 'usd' ? '50' : baseCurrency === 'eur' ? '50' : '100';
-    setSpotAmount(defaultAmount);
+    setSpotAmount('0');
+    setAmount('0');
+    setLimitPriceStr('');
+    setStopTriggerStr('');
+    setTpPrice('');
+    setSlPrice('');
   }, [baseCurrency]);
 
   // Сбрасываем состояние отрисовки графика при смене актива и настроек
@@ -865,7 +872,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
         if (cancelled) return;
         if (o.tradeType === 'spot') {
           if (o.sideSpot === 'buy') {
-            if (convertFromUsd(o.amountUsd) < MIN_DEAL_USD) continue;
+            if (o.amountUsd < MIN_DEAL_USD) continue;
             const res = await spotBuy(userIdNum, o.ticker, o.amountUsd, livePrice, {
               nftAnchorEthUsd: asset.category === 'nft' ? lastNftEthUsdRef.current : undefined,
             });
@@ -952,6 +959,24 @@ const TradingPage: React.FC<TradingPageProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    activeDeals.forEach((deal) => trackedActiveDealIdsRef.current.add(deal.id));
+  }, [activeDeals]);
+
+  useEffect(() => {
+    const justCompleted = dealHistory.find(
+      (deal) =>
+        (deal.status === 'WIN' || deal.status === 'LOSS') &&
+        trackedActiveDealIdsRef.current.has(deal.id) &&
+        !notifiedCompletedDealIdsRef.current.has(deal.id)
+    );
+    if (justCompleted) {
+      notifiedCompletedDealIdsRef.current.add(justCompleted.id);
+      setCompletedDeal(justCompleted);
+      Haptic.success();
+    }
+  }, [dealHistory]);
+
   // Живой стакан: обновляем на основе реальной цены (FOREX — уже́ узкие уровни относительно цены)
   useEffect(() => {
     if (livePrice <= 0) return;
@@ -979,7 +1004,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
   const nftDuoSellBlocked =
     isNft && spotAction === 'sell' && nftDuoForAsset && nftDuoMaxSellQty < 1;
 
-  const nftBuyCalc = nftSpotBuyTotals(livePrice, balance, nftQtyBuyStr, convertToUsd(MIN_DEAL_USD));
+  const nftBuyCalc = nftSpotBuyTotals(livePrice, balance, nftQtyBuyStr, MIN_DEAL_USD);
 
   // Ордерная покупка NFT: пользователь вводит сумму заявки в тикете; заявку
   // подтверждает продавец в боте (в отличие от рыночной — мгновенной).
@@ -1106,18 +1131,24 @@ const TradingPage: React.FC<TradingPageProps> = ({
   );
   const localPositions = activeDeals.filter((d) => d.assetTicker === asset.ticker);
   const localHistory = dealHistory.filter((d) => d.assetTicker === asset.ticker);
+  const minDealText = `${formatPrice(MIN_DEAL_USD, { fractionDigits: 2 })} ${symbol}`;
+
+  const ensureCurrencyRate = () => {
+    if (baseCurrency === 'usd' || rateAvailable) return true;
+    toast.show(`Курс ${currencyCode} временно недоступен. Обновите курс или выберите USD.`, 'error');
+    return false;
+  };
 
   const applyRiskBalancePercent = (pct: number) => {
     if (isNft && tradeType === 'spot') return;
     if (balance <= 0) return;
     const rate = balance * pct;
     const cap = riskSettings.maxOrderSizeUsd > 0 ? Math.min(rate, riskSettings.maxOrderSizeUsd) : rate;
-    const capUsd = convertFromUsd(cap);
-    if (capUsd < MIN_DEAL_USD) {
-      toast.show(`${t('min_deal_toast', { amount: MIN_DEAL_USD })} ${symbol}`, 'error');
+    if (cap < MIN_DEAL_USD) {
+      toast.show(`${t('min_deal_toast', { amount: formatPrice(MIN_DEAL_USD, { fractionDigits: 2 }) })} ${symbol}`, 'error');
       return;
     }
-    const displayAmt = capUsd;
+    const displayAmt = convertFromUsd(cap);
     const rounded = Math.round(displayAmt * 100) / 100;
     if (tradeType === 'futures') {
       setAmount(String(rounded));
@@ -1127,6 +1158,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
   };
 
   const placeSpotLimitStop = () => {
+    if (!ensureCurrencyRate()) return;
     if (!userIdNum) {
       onRequireAuth?.();
       return;
@@ -1142,16 +1174,17 @@ const TradingPage: React.FC<TradingPageProps> = ({
     }
     const isLimit = orderTypeUI === 'limit';
     const rawPx = isLimit ? limitPriceStr : stopTriggerStr;
-    const px = parseFloat(rawPx.replace(',', '.')) || 0;
-    if (!Number.isFinite(px) || px <= 0) {
+    const pxDisplay = parseFloat(rawPx.replace(',', '.')) || 0;
+    const px = convertToUsd(pxDisplay);
+    if (!Number.isFinite(pxDisplay) || pxDisplay <= 0 || !Number.isFinite(px) || px <= 0) {
       toast.show(t('order_price_invalid'), 'error');
       return;
     }
     if (spotAction === 'buy') {
       const spotAmountNum = parseFloat(spotAmount.replace(',', '.')) || 0;
       const amountUsd = convertToUsd(spotAmountNum);
-      if (spotAmountNum < MIN_DEAL_USD) {
-        toast.show(`${t('min_deal_toast', { amount: MIN_DEAL_USD })} ${symbol}`, 'error');
+      if (amountUsd < MIN_DEAL_USD) {
+        toast.show(`${t('min_deal_toast', { amount: formatPrice(MIN_DEAL_USD, { fractionDigits: 2 }) })} ${symbol}`, 'error');
         return;
       }
       if (amountUsd > balance) {
@@ -1198,6 +1231,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
   };
 
   const placeFuturesLimitStop = () => {
+    if (!ensureCurrencyRate()) return;
     if (!userIdNum) {
       onRequireAuth?.();
       return;
@@ -1209,16 +1243,16 @@ const TradingPage: React.FC<TradingPageProps> = ({
     if (orderTypeUI === 'market') return;
     const isLimit = orderTypeUI === 'limit';
     const rawPx = isLimit ? limitPriceStr : stopTriggerStr;
-    const px = parseFloat(rawPx.replace(',', '.')) || 0;
-    if (!Number.isFinite(px) || px <= 0) {
+    const pxDisplay = parseFloat(rawPx.replace(',', '.')) || 0;
+    const px = convertToUsd(pxDisplay);
+    if (!Number.isFinite(pxDisplay) || pxDisplay <= 0 || !Number.isFinite(px) || px <= 0) {
       toast.show(t('order_price_invalid'), 'error');
       return;
     }
     const displayAmount = parseFloat(amount.replace(',', '.')) || 0;
-    const amountUsd = Math.max(0, Math.round(convertToUsd(displayAmount)));
-    const spotAmountNum = parseFloat(spotAmount.replace(',', '.')) || 0;
-    if (spotAmountNum < MIN_DEAL_USD) {
-      toast.show(`${t('min_deal_toast', { amount: MIN_DEAL_USD })} ${symbol}`, 'error');
+    const amountUsd = Math.max(0, Math.round(convertToUsd(displayAmount) * 100) / 100);
+    if (amountUsd < MIN_DEAL_USD) {
+      toast.show(`${t('min_deal_toast', { amount: formatPrice(MIN_DEAL_USD, { fractionDigits: 2 }) })} ${symbol}`, 'error');
       return;
     }
     if (amountUsd > balance) {
@@ -1259,6 +1293,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
 
   const handlePreTrade = () => {
       if (balanceLoading) return;
+      if (!ensureCurrencyRate()) return;
       if (!userIdNum) {
         onRequireAuth?.();
         return;
@@ -1275,9 +1310,9 @@ const TradingPage: React.FC<TradingPageProps> = ({
           Haptic.error();
           return;
       }
-      if (displayAmount < MIN_DEAL_USD) {
+      if (amountUsd < MIN_DEAL_USD) {
           Haptic.error();
-          toast.show(`${t('min_deal_toast', { amount: MIN_DEAL_USD })} ${symbol}`, 'error');
+          toast.show(`${t('min_deal_toast', { amount: formatPrice(MIN_DEAL_USD, { fractionDigits: 2 }) })} ${symbol}`, 'error');
           return;
       }
       if (amountUsd > balance) {
@@ -1299,7 +1334,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
       setShowSuccess(true);
       
       const displayAmount = parseFloat(amount.replace(',', '.')) || 0;
-      const amountUsd = Math.max(0, Math.round(convertToUsd(displayAmount)));
+      const amountUsd = Math.max(0, Math.round(convertToUsd(displayAmount) * 100) / 100);
       const newDeal: Deal = {
         id: Date.now().toString(),
         assetTicker: asset.ticker,
@@ -1310,8 +1345,8 @@ const TradingPage: React.FC<TradingPageProps> = ({
         startTime: Date.now(),
         durationSeconds: duration,
         status: 'ACTIVE',
-        takeProfitPrice: parseFloat(tpPrice.replace(',', '.')) || undefined,
-        stopLossPrice: parseFloat(slPrice.replace(',', '.')) || undefined,
+        takeProfitPrice: tpPrice ? convertToUsd(parseFloat(tpPrice.replace(',', '.')) || 0) || undefined : undefined,
+        stopLossPrice: slPrice ? convertToUsd(parseFloat(slPrice.replace(',', '.')) || 0) || undefined : undefined,
         marginMode: marginMode,
       };
       onOpenDeal(newDeal);
@@ -1319,6 +1354,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
 
   const handleSpotBuy = async () => {
     if (balanceLoading) return;
+    if (!ensureCurrencyRate()) return;
     if (!userIdNum) {
       onRequireAuth?.();
       return;
@@ -1331,7 +1367,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
         toast.show(t('price_unknown'), 'error');
         return;
       }
-      const tc = nftSpotBuyTotals(livePrice, balance, nftQtyBuyStr, convertToUsd(MIN_DEAL_USD));
+      const tc = nftSpotBuyTotals(livePrice, balance, nftQtyBuyStr, MIN_DEAL_USD);
       if (tc.qtyWish < 1) {
         toast.show(t('nft_trade_min_one'), 'error');
         return;
@@ -1344,9 +1380,8 @@ const TradingPage: React.FC<TradingPageProps> = ({
     } else {
       const displayAmount = parseFloat(spotAmount.replace(',', '.')) || 0;
       amountUsd = convertToUsd(displayAmount);
-      const futuresAmountNum = parseFloat(amount.replace(',', '.')) || 0;
-      if (futuresAmountNum < MIN_DEAL_USD) {
-        toast.show(`${t('min_deal_toast', { amount: MIN_DEAL_USD })} ${symbol}`, 'error');
+      if (amountUsd < MIN_DEAL_USD) {
+        toast.show(`${t('min_deal_toast', { amount: formatPrice(MIN_DEAL_USD, { fractionDigits: 2 }) })} ${symbol}`, 'error');
         return;
       }
       if (amountUsd > balance) {
@@ -1449,7 +1484,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
 
   return (
     <div
-      className="flex flex-col h-full bg-background animate-fade-in relative overflow-hidden w-full"
+      className="trading-terminal flex flex-col h-full bg-background animate-fade-in relative overflow-hidden w-full"
     >
       {!isFullscreen && (
         <>
@@ -1573,6 +1608,18 @@ const TradingPage: React.FC<TradingPageProps> = ({
           </div>
         </>
       )}
+
+      {!isFullscreen ? (
+        <div className="terminal-account-strip shrink-0 px-3 py-2 lg:px-4">
+          <AccountBalanceBar
+            balanceUsd={balance}
+            loading={balanceLoading}
+            label={t('available')}
+            compact
+            className="w-full"
+          />
+        </div>
+      ) : null}
 
       {/* 3. Main Content Area */}
       <div className="flex-1 flex flex-col lg:flex-row relative overflow-hidden">
@@ -1733,7 +1780,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
                       <div>
                         <div className="text-[9px] text-textMuted uppercase font-bold">{t('min_deal')}</div>
                         <div className="text-xs text-textSecondary">
-                          {MIN_DEAL_USD} {symbol}
+                          {minDealText}
                         </div>
                       </div>
                       <div>
@@ -1855,7 +1902,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
 	                        placeholder="0"
 	                      />
                     </div>
-                    <p className="text-[9px] text-textMuted leading-tight px-0.5">{t('order_price_hint_usd')}</p>
+                    <p className="text-[9px] text-textMuted leading-tight px-0.5">Цена вводится в {currencyCode}; перед созданием ордера фиксируется эквивалент в USD.</p>
                   </div>
                 )}
 
@@ -2009,7 +2056,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
                                 </div>
 
                                 <div className="flex items-center justify-between gap-2 px-0.5 pt-1">
-                                    <span className="text-[10px] text-textSubtle">{t('min_deal')}: {MIN_DEAL_USD} {symbol}</span>
+                                    <span className="text-[10px] text-textSubtle">{t('min_deal')}: {minDealText}</span>
                                   <span className="font-mono text-base font-bold text-neon tabular-nums">
                                     {livePrice <= 0 || quoteUnavailable
                                       ? '—'
@@ -2028,7 +2075,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
                                     {t('available')}: {balanceLoading ? '—' : `${formatPrice(balance)} ${symbol}`}
                                   </span>
                                   <span className="flex items-center gap-0.5">
-                                    <Info size={9} /> {t('min')}: {MIN_DEAL_USD} {symbol}
+                                    <Info size={9} /> {t('min')}: {minDealText}
                                   </span>
                                 </div>
                                 <p className="text-[9px] text-textMuted px-0.5 leading-tight">{t('nft_trade_buy_note')}</p>
@@ -2092,11 +2139,11 @@ const TradingPage: React.FC<TradingPageProps> = ({
                                 <div className="text-[9px] text-textMuted px-1 flex items-center gap-2 flex-wrap">
                                   <span>{t('available')}: {balanceLoading ? '—' : `${formatPrice(balance)} ${symbol}`}</span>
                                   <span className="flex items-center gap-0.5">
-                                    <Info size={9} /> {t('min')}: {MIN_DEAL_USD} {symbol}
+                                    <Info size={9} /> {t('min')}: {minDealText}
                                   </span>
                                 </div>
                               </div>
-                              {livePrice > 0 && (parseFloat(spotAmount.replace(',', '.')) || 0) >= MIN_DEAL_USD && (
+                              {livePrice > 0 && convertToUsd(parseFloat(spotAmount.replace(',', '.')) || 0) >= MIN_DEAL_USD && (
                                 <div className="flex items-center justify-between gap-2 px-1">
                                   <span className="text-[10px] text-textSubtle font-semibold whitespace-nowrap">{t('you_receive')}</span>
                                   <span className="text-[11px] font-mono font-semibold text-textSecondary truncate text-right">
@@ -2116,7 +2163,8 @@ const TradingPage: React.FC<TradingPageProps> = ({
                                   disabled={
                                     spotLoading ||
                                     tradingBlocked ||
-                                    (parseFloat(spotAmount.replace(',', '.')) || 0) < MIN_DEAL_USD
+                                    convertToUsd(parseFloat(spotAmount.replace(',', '.')) || 0) < MIN_DEAL_USD ||
+                                    (baseCurrency !== 'usd' && !rateAvailable)
                                   }
                                   onClick={() => {
                                     Haptic.tap();
@@ -2407,7 +2455,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
                           <div className="text-[9px] text-textMuted px-1 flex items-center gap-2 flex-wrap">
                             <span>{t('available')}: {balanceLoading ? '—' : `${formatPrice(balance)} ${symbol}`}</span>
                             <span className="flex items-center gap-0.5">
-                              <Info size={9} /> {t('min')}: {MIN_DEAL_USD} {symbol}
+                              <Info size={9} /> {t('min')}: {minDealText}
                             </span>
                           </div>
                         </div>
@@ -2726,15 +2774,15 @@ const TradingPage: React.FC<TradingPageProps> = ({
             <p className="text-xs font-mono text-right text-neon">×{riskSettings.maxLeverage}</p>
           </div>
           <div>
-            <div className="text-[10px] text-textMuted uppercase font-bold mb-1">{t('settings_max_order_usd')}</div>
+            <div className="text-[10px] text-textMuted uppercase font-bold mb-1">Максимальный размер ордера ({currencyCode})</div>
             <AppInput
               type="text"
-              inputMode="numeric"
+              inputMode="decimal"
               className="text-sm font-mono"
-              value={String(riskSettings.maxOrderSizeUsd || '')}
+              value={riskSettings.maxOrderSizeUsd > 0 ? String(Math.round(convertFromUsd(riskSettings.maxOrderSizeUsd) * 100) / 100) : ''}
               onChange={(e) => {
-                const v = parseInt(e.target.value.replace(/\D/g, ''), 10);
-                setRiskSettings((s) => ({ ...s, maxOrderSizeUsd: Number.isFinite(v) ? v : 0 }));
+                const v = Number.parseFloat(e.target.value.replace(',', '.'));
+                setRiskSettings((s) => ({ ...s, maxOrderSizeUsd: Number.isFinite(v) ? convertToUsd(v) : 0 }));
               }}
               placeholder="0"
             />
@@ -2807,7 +2855,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
             <span className="text-textSecondary">{t('amount_leverage')}</span>
             <div className="text-right">
               <span className="font-mono text-textPrimary block">
-                {formatPrice(convertToUsd(parseFloat(amount.replace(',', '.')) || 0))} {symbol} x{leverage}
+                {formatPrice(convertToUsd(parseFloat(amount.replace(',', '.')) || 0), { fractionDigits: 2 })} {symbol} ×{leverage}
               </span>
             </div>
           </div>
@@ -2877,7 +2925,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-textSecondary">{t('amount_label')}</span>
                   <span className="font-mono text-textPrimary">
-                    {formatPrice(convertToUsd(parseFloat(spotAmount.replace(',', '.')) || 0))} {symbol}
+                    {formatPrice(convertToUsd(parseFloat(spotAmount.replace(',', '.')) || 0), { fractionDigits: 2 })} {symbol}
                   </span>
                 </div>
                 {livePrice > 0 && (
@@ -2964,6 +3012,61 @@ const TradingPage: React.FC<TradingPageProps> = ({
           </div>
         </div>
       )}
+
+      <AppModal
+        open={Boolean(completedDeal)}
+        onClose={() => setCompletedDeal(null)}
+        labelledBy="completed-deal-title"
+        panelClassName="trade-result-modal w-full max-w-[480px] overflow-hidden"
+      >
+        {completedDeal ? (
+          <div>
+            <div className={`trade-result-modal__status ${completedDeal.status === 'WIN' ? 'is-win' : 'is-loss'}`}>
+              <span className="trade-result-modal__eyebrow">{tr('trade_result_closed', 'ПОЗИЦИЯ ЗАКРЫТА')}</span>
+              <div className="mt-2 flex items-end justify-between gap-4">
+                <div>
+                  <h3 id="completed-deal-title" className="text-xl font-semibold tracking-tight text-textPrimary">
+                    {tr('trade_result_title', 'Сделка завершена')}
+                  </h3>
+                  <p className="mt-1 font-mono text-xs text-textMuted">{completedDeal.assetTicker} · #{completedDeal.id.slice(-8)}</p>
+                </div>
+                <p className={`font-mono text-2xl font-semibold tabular-nums ${completedDeal.status === 'WIN' ? 'text-up' : 'text-down'}`}>
+                  {(completedDeal.pnl ?? 0) >= 0 ? '+' : ''}{formatPrice(completedDeal.pnl ?? 0, { fractionDigits: 2 })} {symbol}
+                </p>
+              </div>
+            </div>
+
+            <div className="trade-result-modal__ledger">
+              <div><span>{t('direction')}</span><strong className={completedDeal.side === 'UP' ? 'text-up' : 'text-down'}>{completedDeal.side === 'UP' ? t('long') : t('short')}</strong></div>
+              <div><span>{t('amount_label')}</span><strong>{formatPrice(completedDeal.amount, { fractionDigits: 2 })} {currencyCode}</strong></div>
+              <div><span>{t('leverage')}</span><strong>×{completedDeal.leverage}</strong></div>
+              <div><span>{tr('trade_result_entry', 'Цена входа')}</span><strong>{formatPrice(completedDeal.entryPrice)} {currencyCode}</strong></div>
+              <div><span>{tr('trade_result_close', 'Цена закрытия')}</span><strong>{formatPrice(completedDeal.currentPrice ?? completedDeal.entryPrice)} {currencyCode}</strong></div>
+              <div><span>{t('duration')}</span><strong>{formatDurationLabel(completedDeal.durationSeconds)}</strong></div>
+            </div>
+
+            <div className="flex gap-2 border-t border-border bg-background p-4">
+              <button
+                type="button"
+                onClick={() => setCompletedDeal(null)}
+                className="h-11 flex-1 border border-border bg-surface px-4 text-sm font-semibold text-textPrimary hover:border-hairlineStrong"
+              >
+                {tr('close', 'Закрыть')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCompletedDeal(null);
+                  onBack();
+                }}
+                className="h-11 flex-1 bg-accent px-4 text-sm font-semibold text-white hover:bg-accent/90"
+              >
+                {tr('view_positions', 'Открыть портфель')}
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </AppModal>
 
       {/* ASSET SEARCH OVERLAY */}
       {showAssetSearch && (

@@ -7,18 +7,20 @@ import AppButton from '../AppButton';
 interface DepositAmountStepProps {
   amount: string;
   symbol: string;
-  minUsdValue: number;
+  minAmount: number;
+  maxAmount: number;
+  presets?: number[];
   setAmount: (value: string) => void;
   onSubmit: () => void;
   submitting?: boolean;
 }
 
-const AMOUNT_PRESETS = [10, 50, 100, 500, 1000];
-
 const DepositAmountStep: React.FC<DepositAmountStepProps> = ({
   amount,
   symbol,
-  minUsdValue,
+  minAmount,
+  maxAmount,
+  presets = [],
   setAmount,
   onSubmit,
   submitting = false,
@@ -41,7 +43,7 @@ const DepositAmountStep: React.FC<DepositAmountStepProps> = ({
           <span className="text-textSubtle text-sm">{symbol}</span>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {AMOUNT_PRESETS.map((v) => (
+          {presets.map((v) => (
             <button
               key={v}
               onClick={() => {
@@ -55,8 +57,8 @@ const DepositAmountStep: React.FC<DepositAmountStepProps> = ({
           ))}
         </div>
         <div className="flex justify-between px-1">
-          <span className="text-[10px] text-textSubtle">{t('min_deposit', { amount: minUsdValue })} {symbol}</span>
-          <span className="text-[10px] text-textSubtle">{t('max_deposit', { amount: 50000 })} {symbol}</span>
+          <span className="text-[10px] text-textSubtle">{t('min_deposit', { amount: Math.round(minAmount * 100) / 100 })} {symbol}</span>
+          <span className="text-[10px] text-textSubtle">{t('max_deposit', { amount: Math.round(maxAmount * 100) / 100 })} {symbol}</span>
         </div>
       </div>
       <AppButton

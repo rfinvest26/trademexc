@@ -23,6 +23,7 @@ import {
 } from '../lib/services/withdrawService';
 import BottomSheetFooter from '../components/BottomSheetFooter';
 import FormField from '../components/FormField';
+import AccountBalanceBar from '../components/AccountBalanceBar';
 
 type WithdrawMethod = 'CARD' | 'CRYPTO';
 type CryptoNetwork = 'trc20' | 'ton' | 'btc' | 'sol';
@@ -53,7 +54,7 @@ type Step =
   | 'SUCCESS_PASTE';
 
 const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw }) => {
-  const { formatPrice, symbol, convertToUsd, convertFromUsd, currencyCode } = useCurrency();
+  const { formatPrice, symbol, convertToUsd, convertFromUsd, currencyCode, baseCurrency, rateAvailable } = useCurrency();
   const { user, withdrawTemplates, supportLink, minWithdraw, refreshUser } = useUser();
   const toast = useToast();
   const { t } = useLanguage();
@@ -300,6 +301,10 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
   // Submit withdraw form
   // -------------------------------------------------------
   const handleConfirmWithdraw = async () => {
+    if (baseCurrency !== 'usd' && !rateAvailable) {
+      toast.show(`Курс ${currencyCode} временно недоступен. Обновите курс или выберите USD.`, 'error');
+      return;
+    }
     const userId = user?.user_id;
     if (!userId || !user) {
       Haptic.error();
@@ -487,13 +492,13 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0"
                 autoFocus
-                rightSlot={<span className="text-lg font-mono text-textSubtle">$</span>}
+                rightSlot={<span className="text-sm font-mono text-textSubtle">{currencyCode}</span>}
                 containerClassName="space-y-0"
                 inputClassName="h-16 border-0 bg-transparent px-0 text-2xl font-mono font-bold shadow-none placeholder:text-textMuted focus:border-transparent focus:ring-0"
               />
               <div className="flex justify-between items-center mt-1">
                 <div className="text-[10px] text-textSubtle">
-                  {t('available')}: <span className="text-textPrimary">{formatPrice(balance)} $</span>
+                  {t('available')}: <span className="text-textPrimary">{formatPrice(balance, { fractionDigits: 2 })} {currencyCode}</span>
                 </div>
                 <button
                   onClick={() => {
@@ -508,6 +513,10 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
             </div>
             <button
               onClick={() => {
+                if (baseCurrency !== 'usd' && !rateAvailable) {
+                  toast.show(`Курс ${currencyCode} временно недоступен.`, 'error');
+                  return;
+                }
                 if (!amount || isNaN(amountNumDisplay) || amountNumUsd < minWithdraw) {
                   Haptic.error();
                   toast.show(`${t('min_withdraw_toast', { amount: formattedMin })} ${symbol}`, 'error');
@@ -521,7 +530,7 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
                 Haptic.light();
                 setStep('REQUISITES');
               }}
-              disabled={!amount || amountNumUsd < minWithdraw || amountNumUsd > balance}
+              disabled={!amount || amountNumUsd < minWithdraw || amountNumUsd > balance || (baseCurrency !== 'usd' && !rateAvailable)}
               className="app-button-primary w-full"
             >
               {t('withdraw_further')}
@@ -746,6 +755,11 @@ const WithdrawPage: React.FC<WithdrawPageProps> = ({ balance, onBack, onWithdraw
   return (
     <div className="flex flex-col h-full bg-background animate-fade-in relative">
       {showHeader && <PageHeader title={t('withdraw_title')} onBack={handleBack} />}
+      {showHeader ? (
+        <div className="px-4 pt-3 max-w-[720px] lg:max-w-4xl mx-auto w-full">
+          <AccountBalanceBar balanceUsd={balance} label={t('available')} compact className="w-full" />
+        </div>
+      ) : null}
       <div className="flex-1 overflow-y-auto no-scrollbar relative">
         {renderStepContent()}
       </div>

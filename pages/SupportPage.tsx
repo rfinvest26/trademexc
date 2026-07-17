@@ -21,7 +21,6 @@ import {
   Wallet,
   ArrowDownToLine,
   LogIn,
-  ShieldCheck,
   RefreshCw,
   MoreHorizontal,
   ArrowLeft,
@@ -160,7 +159,6 @@ const QUICK_TOPICS: { id: string; labelKey: string; Icon: LucideIcon }[] = [
   { id: 'deposit', labelKey: 'support_topic_deposit', Icon: Wallet },
   { id: 'withdraw', labelKey: 'support_topic_withdraw', Icon: ArrowDownToLine },
   { id: 'login', labelKey: 'support_topic_login', Icon: LogIn },
-  { id: 'kyc', labelKey: 'support_topic_kyc', Icon: ShieldCheck },
   { id: 'p2p', labelKey: 'support_topic_p2p', Icon: RefreshCw },
   { id: 'other', labelKey: 'support_topic_other', Icon: MoreHorizontal },
 ];

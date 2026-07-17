@@ -203,7 +203,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           withdraw_blocked?: unknown;
           stats_wins?: unknown;
           stats_losses?: unknown;
-          is_kyc?: unknown;
           preferred_currency?: unknown;
           preferred_locale?: unknown;
         };
@@ -221,7 +220,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             withdraw_blocked: nextRow.withdraw_blocked === true || nextRow.withdraw_blocked === false ? nextRow.withdraw_blocked : prev.withdraw_blocked,
             stats_wins: nextRow.stats_wins == null ? prev.stats_wins : toFiniteNumber(nextRow.stats_wins, toFiniteNumber(prev.stats_wins)),
             stats_losses: nextRow.stats_losses == null ? prev.stats_losses : toFiniteNumber(nextRow.stats_losses, toFiniteNumber(prev.stats_losses)),
-            is_kyc: nextRow.is_kyc === true || nextRow.is_kyc === false ? nextRow.is_kyc : prev.is_kyc,
             preferred_currency:
               typeof nextRow.preferred_currency === 'string'
                 ? normalizeCurrencyCode(nextRow.preferred_currency, normalizeCurrencyCode(prev.preferred_currency))

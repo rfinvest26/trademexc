@@ -28,7 +28,6 @@ export interface TradeUserRow extends TradeRow {
   worker_trade_move_min?: NumericLike;
   worker_trade_move_max?: NumericLike;
   withdraw_message_type?: string | null;
-  is_kyc?: boolean | null;
   web_registered?: boolean | null;
   trading_blocked?: boolean | null;
   withdraw_blocked?: boolean | null;

@@ -5,7 +5,6 @@ export const MAIN_NAV_PAGE_MAP: Partial<Record<PageView, PageView>> = {
   DEPOSIT: 'HOME',
   WITHDRAW: 'HOME',
   PROFILE: 'HOME',
-  KYC: 'HOME',
   SUPPORT: 'HOME',
   LANGUAGE: 'HOME',
   CURRENCY: 'HOME',

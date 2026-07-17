@@ -174,7 +174,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ refId, bonus, onLogin, onRegi
             </div>
             <h2 className="mt-5 text-[24px] font-black leading-tight tracking-[-0.04em] text-white">Security first, reward ready.</h2>
             <p className="mt-3 text-[14px] leading-6 text-textSecondary">
-              Identity checks, reserve-minded messaging and a clear account path build trust before the first trade.
+              Account protection, reserve-minded controls and a clear support path build trust before the first trade.
             </p>
             <button
               type="button"
@@ -195,7 +195,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ refId, bonus, onLogin, onRegi
             <div className="flex flex-wrap gap-x-5 gap-y-2 text-[12px] font-medium text-textMuted">
               <button type="button" onClick={() => setLegal('tos')} className="hover:text-textPrimary">Terms</button>
               <button type="button" onClick={() => setLegal('privacy')} className="hover:text-textPrimary">Privacy</button>
-              <button type="button" onClick={() => setLegal('aml')} className="hover:text-textPrimary">AML/KYC</button>
+              <button type="button" onClick={() => setLegal('aml')} className="hover:text-textPrimary">AML Policy</button>
               <button type="button" onClick={() => setLegal('cookies')} className="hover:text-textPrimary">Cookies</button>
             </div>
           </div>

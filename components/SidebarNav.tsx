@@ -1,14 +1,14 @@
 import React from 'react';
-import { MessageCircle, LogOut, ShieldCheck, ShieldAlert, User } from 'lucide-react';
+import { MessageCircle, LogOut, User } from 'lucide-react';
 import { PageView } from '../types';
 import { Haptic } from '../utils/haptics';
 import { useLanguage } from '../context/LanguageContext';
 import { useUser } from '../context/UserContext';
 import { useWebAuth } from '../context/WebAuthContext';
-import Skeleton from './Skeleton';
 import UnifiedMarketsRibbon from './UnifiedMarketsRibbon';
 import UserAvatar from './UserAvatar';
 import { createMainNavItems, MAIN_NAV_PAGE_MAP } from './navigation';
+import AccountBalanceBar from './AccountBalanceBar';
 
 interface SidebarNavProps {
   currentPage: PageView;
@@ -85,6 +85,16 @@ const SidebarNav: React.FC<SidebarNavProps> = ({ currentPage, onNavigate }) => {
           <div className="h-px bg-border my-2 mx-2" />
 
           {user ? (
+            <AccountBalanceBar
+              balanceUsd={Number(balance) || 0}
+              loading={balanceLoading}
+              label={t('available')}
+              compact
+              className="mb-2 w-full"
+            />
+          ) : null}
+
+          {user ? (
             <div className="flex items-center gap-3 px-2 py-2 mt-1">
               <UserAvatar
                 name={displayName}
@@ -95,17 +105,7 @@ const SidebarNav: React.FC<SidebarNavProps> = ({ currentPage, onNavigate }) => {
               />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold text-textPrimary truncate">{displayName}</p>
-                <div className="flex items-center gap-1 mt-0.5">
-                  {user.is_kyc ? (
-                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                      <ShieldCheck size={10} /> {t('verified') || 'Verified'}
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-[10px] font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded">
-                      <ShieldAlert size={10} /> {t('verification_required') || 'Unverified'}
-                    </span>
-                  )}
-                </div>
+                <p className="mt-0.5 truncate font-mono text-[10px] text-textMuted">#{user.user_id}</p>
               </div>
               {isWebUser && (
                 <button

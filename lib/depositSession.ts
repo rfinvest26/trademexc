@@ -13,6 +13,9 @@ export interface DepositSessionData {
   step: 'PAYMENT';
   method: DepositMethod;
   amount: string;
+  /** Fixed storage/payment equivalent, so a resumed session survives display-currency changes. */
+  amountUsd?: number;
+  displayCurrency?: string;
   cryptoNetwork: CryptoNetwork;
   senderName: string;
   guestContact: string;

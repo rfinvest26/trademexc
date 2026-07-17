@@ -7,20 +7,16 @@ import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useWebAuth } from '../context/WebAuthContext';
 import UserAvatar from '../components/UserAvatar';
+import AccountBalanceBar from '../components/AccountBalanceBar';
+import { useCurrency } from '../context/CurrencyContext';
 import { getMyNftOrders, getMyNftOwned, nftOrderStatusMeta, nftOwnedStatusMeta, type NftOrderRow, type NftOwnedRow, type NftStatusTone } from '../lib/nftOrders';
 
 interface ProfilePageProps {
   deals: Deal[];
   onBack: () => void;
-  onNavigateToKyc?: () => void;
   onNavigateToLanguage?: () => void;
   onNavigateToSupport?: () => void;
   onNavigateToNft?: () => void;
-}
-
-function formatUsd(value: number): string {
-  if (!Number.isFinite(value)) return '$0';
-  return `$${value.toLocaleString('en-US', { minimumFractionDigits: value % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
 }
 
 function nftOrderTitle(order: NftOrderRow): string {
@@ -53,13 +49,13 @@ function nftStatusClass(tone: NftStatusTone): string {
 const ProfilePage: React.FC<ProfilePageProps> = ({
   deals,
   onBack,
-  onNavigateToKyc,
   onNavigateToLanguage,
   onNavigateToSupport,
   onNavigateToNft,
 }) => {
   const { user, supportLink } = useUser();
   const { logout } = useWebAuth();
+  const { formatPrice, currencyCode } = useCurrency();
   const { t, locale } = useLanguage();
   const [showLegalModal, setShowLegalModal] = useState(false);
   const [pendingNftOrders, setPendingNftOrders] = useState<NftOrderRow[]>([]);
@@ -154,34 +150,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
         </div>
 
-        {!isGuest && (
-          <div className="mb-5">
-            {user?.is_kyc === true ? (
-              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-surfaceElevated">
-                <ShieldCheck size={18} className="text-up flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-up">{t('verified')}</p>
-                  <p className="text-[11px] text-textSubtle mt-0.5">Full trading access · All limits unlocked</p>
-                </div>
-              </div>
-            ) : (
-              <button
-                onClick={() => {
-                  Haptic.tap();
-                  onNavigateToKyc?.();
-                }}
-                className="w-full px-4 py-3.5 rounded-xl bg-surfaceElevated flex items-center gap-3 active:scale-[0.99] transition-transform text-left"
-              >
-                <ShieldAlert size={18} className="text-accent flex-shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-textPrimary">{t('verification_required')}</p>
-                  <p className="text-[11px] text-textSubtle mt-0.5">Verify to unlock withdrawals & higher limits</p>
-                </div>
-                <ChevronRight size={16} className="text-textSubtle flex-shrink-0" />
-              </button>
-            )}
-          </div>
-        )}
+        {!isGuest ? (
+          <AccountBalanceBar
+            balanceUsd={Number(user?.balance) || 0}
+            label={isRu ? 'Баланс счёта' : 'Account balance'}
+            className="mb-5 w-full"
+          />
+        ) : null}
 
         {isGuest && (
           <p className="text-xs text-textMuted mb-5">{t('open_from_web_hint')}</p>
@@ -204,7 +179,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
               <div className="flex-1 min-w-0">
                 <h3 className="text-base font-bold text-textPrimary">{isRu ? 'NFT-портфель' : 'NFT Portfolio'}</h3>
                 <p className="text-xs text-textMuted mt-0.5">
-                  {isRu ? 'Баланс активов:' : 'Total Value:'} <span className="font-mono font-medium text-textPrimary">{formatUsd(pendingNftTotal + ownedNftTotal)}</span>
+                  {isRu ? 'Баланс активов:' : 'Total Value:'} <span className="font-mono font-medium text-textPrimary">{formatPrice(pendingNftTotal + ownedNftTotal, { fractionDigits: 2 })} {currencyCode}</span>
                 </p>
               </div>
               {onNavigateToNft && <ChevronRight size={16} className="text-textSubtle shrink-0" />}
@@ -225,7 +200,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                     </div>
                   </div>
                   <div className="text-right shrink-0 pl-3">
-                    <p className="font-mono text-[13px] font-bold text-textPrimary">{formatUsd(Number(order.price_usd) || 0)}</p>
+                    <p className="font-mono text-[13px] font-bold text-textPrimary">{formatPrice(Number(order.price_usd) || 0, { fractionDigits: 2 })} {currencyCode}</p>
                     <p className="text-[11px] text-textMuted mt-0.5">{isRu ? 'Покупка' : 'Buy'}</p>
                   </div>
                 </div>
@@ -246,7 +221,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                       </div>
                     </div>
                     <div className="text-right shrink-0 pl-3">
-                      <p className="font-mono text-[13px] font-bold text-textPrimary">{formatUsd(Number(row.list_price_usd ?? row.acquired_price_usd) || 0)}</p>
+                      <p className="font-mono text-[13px] font-bold text-textPrimary">{formatPrice(Number(row.list_price_usd ?? row.acquired_price_usd) || 0, { fractionDigits: 2 })} {currencyCode}</p>
                       <p className="text-[11px] text-textMuted mt-0.5">{row.status === 'listed' ? (isRu ? 'На продаже' : 'Listed') : (isRu ? 'В коллекции' : 'Owned')}</p>
                     </div>
                   </div>

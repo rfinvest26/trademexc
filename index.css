@@ -2,26 +2,26 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #0D1117;
-  --color-surface: #121922;
-  --color-card: #121922;
-  --color-border: rgba(255,255,255,0.06);
-  --color-surfaceElevated: #171f2a;
-  --color-subtle: #0D1117;
-  --color-neon: #2196F3;
-  --color-accent: #2196F3;
-  --color-accentMuted: rgba(33, 150, 243, 0.1);
-  --color-up: #00C076;
-  --color-down: #FF4D4D;
-  --color-ink: #ffffff;
-  --color-textPrimary: #E0E0E0;
-  --color-textSecondary: #8b949e;
-  --color-textMuted: #6e7681;
-  --color-textSubtle: #484f58;
+  --color-background: #0B1016;
+  --color-surface: #101720;
+  --color-card: #101720;
+  --color-border: #202B39;
+  --color-surfaceElevated: #151E29;
+  --color-subtle: #0B1016;
+  --color-neon: #3E73D8;
+  --color-accent: #3E73D8;
+  --color-accentMuted: rgba(62, 115, 216, 0.12);
+  --color-up: #16B68E;
+  --color-down: #E35D67;
+  --color-ink: #F2F5F8;
+  --color-textPrimary: #E4E9EF;
+  --color-textSecondary: #94A0AF;
+  --color-textMuted: #6F7C8D;
+  --color-textSubtle: #526071;
   --color-textCaption: #6e7681;
-  --color-hairline: rgba(255,255,255,0.04);
-  --color-hairlineStrong: rgba(255,255,255,0.08);
-  --color-divider: rgba(255,255,255,0.05);
+  --color-hairline: #18222E;
+  --color-hairlineStrong: #2B394A;
+  --color-divider: #1B2633;
   --color-icon: #E0E0E0;
   --color-icon-muted: #8b949e;
   --color-icon-subtle: #6e7681;
@@ -91,6 +91,191 @@ body {
   overflow-x: hidden;
   overflow-y: auto;
   color-scheme: dark;
+}
+
+/* Account rail: the balance is a control, not a decorative dashboard card. */
+.account-balance-bar {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-textPrimary);
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+.account-balance-bar:hover {
+  border-color: var(--color-hairlineStrong);
+  background: var(--color-surfaceElevated);
+}
+.account-balance-bar__icon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border);
+  color: var(--color-textSecondary);
+}
+.account-balance-bar__label {
+  display: block;
+  color: var(--color-textMuted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.account-balance-bar__value {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-top: 3px;
+  font-family: var(--font-family-mono);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.account-balance-bar__currency {
+  color: var(--color-textMuted);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+.account-balance-bar--compact {
+  min-height: 44px;
+  padding: 6px 9px;
+  border-radius: 6px;
+}
+.account-balance-bar--compact .account-balance-bar__icon {
+  width: 26px;
+  height: 26px;
+}
+.account-balance-bar--compact .account-balance-bar__value {
+  margin-top: 1px;
+  font-size: 14px;
+}
+.terminal-account-strip {
+  border-bottom: 1px solid var(--color-border);
+  background: #0d131b;
+}
+
+.trade-result-modal {
+  border: 1px solid var(--color-hairlineStrong);
+  border-radius: 8px;
+  background: var(--color-background);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.46);
+}
+.trade-result-modal__status {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.trade-result-modal__status.is-win { border-top: 3px solid var(--color-up); }
+.trade-result-modal__status.is-loss { border-top: 3px solid var(--color-down); }
+.trade-result-modal__eyebrow {
+  color: var(--color-textMuted);
+  font-family: var(--font-family-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+}
+.trade-result-modal__ledger {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--color-border);
+  gap: 1px;
+}
+.trade-result-modal__ledger > div {
+  min-height: 62px;
+  padding: 11px 14px;
+  background: var(--color-background);
+}
+.trade-result-modal__ledger span {
+  display: block;
+  color: var(--color-textMuted);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.trade-result-modal__ledger strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--color-textPrimary);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 1024px) {
+  body { font-size: 13px; }
+
+  .trading-terminal,
+  .trading-terminal * {
+    --shadow-elevation-1: none;
+    --shadow-elevation-2: none;
+    --shadow-elevation-3: none;
+  }
+  .trading-terminal {
+    animation: none !important;
+    background: #0b1016;
+  }
+  .trading-terminal [class*="backdrop-blur"] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  .trading-terminal [class*="bg-gradient"] {
+    background-image: none !important;
+    background-color: var(--color-border) !important;
+  }
+  .trading-terminal .rounded-full,
+  .trading-terminal .rounded-xl,
+  .trading-terminal .rounded-2xl {
+    border-radius: 5px !important;
+  }
+  .trading-terminal button,
+  .trading-terminal input,
+  .trading-terminal textarea {
+    box-shadow: none !important;
+  }
+  .trading-terminal input[type="range"] {
+    border-radius: 0 !important;
+  }
+  .trading-terminal .terminal-account-strip {
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+  .trading-terminal .account-balance-bar {
+    max-width: 340px;
+    margin-left: auto;
+    background: transparent;
+    border-color: transparent;
+  }
+  .trading-terminal .account-balance-bar:hover {
+    border-color: var(--color-border);
+    background: var(--color-surface);
+  }
+  .app-panel {
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    box-shadow: none;
+  }
+  .app-button-primary,
+  .app-modal-panel,
+  .app-input,
+  input,
+  textarea,
+  select {
+    border-radius: 5px !important;
+  }
+  .currency-picker-sheet .bg-background,
+  .currency-picker-sheet button {
+    box-shadow: none !important;
+  }
 }
 
 /** Секции экранов: маленький caps-label для группировки блоков */

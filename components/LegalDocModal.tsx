@@ -14,7 +14,7 @@ interface LegalDocModalProps {
 const TITLES: Record<LegalDocId, string> = {
   tos: 'Terms of Service',
   privacy: 'Privacy Policy',
-  aml: 'AML / KYC',
+  aml: 'AML Policy',
   cookies: 'Cookie Policy',
 };
 
@@ -69,14 +69,14 @@ const LegalDocModal: React.FC<LegalDocModalProps> = ({ doc, onClose }) => {
           )}
           {doc === 'privacy' && (
             <>
-              <p><strong className="text-textPrimary">Данные.</strong> Обрабатываются идентификаторы аккаунта, технические логи и данные, необходимые для KYC/AML.</p>
+              <p><strong className="text-textPrimary">Данные.</strong> Обрабатываются идентификаторы аккаунта и технические логи, необходимые для безопасности и AML-контроля.</p>
               <p><strong className="text-textPrimary">Цели.</strong> Исполнение договора, безопасность, соблюдение закона.</p>
               <p><strong className="text-textPrimary">Права.</strong> Доступ, исправление, ограничение обработки — в порядке, предусмотренном GDPR (применимо).</p>
             </>
           )}
           {doc === 'aml' && (
             <>
-              <p><strong className="text-textPrimary">KYC.</strong> Идентификация клиента и проверка документов при необходимости.</p>
+              <p><strong className="text-textPrimary">Контроль рисков.</strong> Операции могут проходить автоматическую проверку на признаки злоупотреблений.</p>
               <p><strong className="text-textPrimary">AML.</strong> Мониторинг подозрительной активности и отчётность по требованиям регуляторов.</p>
             </>
           )}

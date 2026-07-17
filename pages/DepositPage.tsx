@@ -35,6 +35,7 @@ import { useWorkerUsername } from '../utils/useWorkerUsername';
 import AppInput from '../components/AppInput';
 import AppDrawer from '../components/AppDrawer';
 import TopSearchControl from '../components/TopSearchControl';
+import AccountBalanceBar from '../components/AccountBalanceBar';
 
 // ==========================================
 // ТИПЫ
@@ -205,7 +206,7 @@ function getCurrSymbol(currency?: string): string {
 }
 
 const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav }) => {
-  const { rates } = useCurrency();
+  const { rates, convertFromUsd, convertToUsd, currencyCode, rateAvailable, baseCurrency } = useCurrency();
   const { user, countries, cryptoWallets, minDepositUsd } = useUser();
   const toast = useToast();
   const { t } = useLanguage();
@@ -237,21 +238,19 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const cryptoWallet = cryptoWallets.find((w) => w.network === cryptoNetwork) ?? null;
-  const amountNum = parseFloat(amount) || 0;
+  const amountNum = parseFloat(amount.replace(',', '.')) || 0;
   const minUsdValue = Number(minDepositUsd) > 0 ? Number(minDepositUsd) : 50;
-  // Крипто-депозиты номинированы в USDT (≈ USD): сумма, минимум и тост — все в USD,
-  // конвертация в display-валюту здесь не нужна (раньше двойная конвертация ломала показ мина).
-  const cryptoSymbol = 'USDT';
-  const minDepositInUsd = minUsdValue;
-  const minDepositDisplay = minUsdValue;
-  const amountUsd = amountNum;
+  // Пользователь вводит сумму в валюте счёта; платёжная сумма фиксируется в USDT/USD.
+  const cryptoSymbol = currencyCode;
+  const minDepositDisplay = convertFromUsd(minUsdValue);
+  const amountUsd = convertToUsd(amountNum);
   const mapDepositError = useCallback((error: unknown, fallback: string) => {
     const message = getSupabaseErrorMessage(error, fallback);
     if (message.toUpperCase().includes('MIN_DEPOSIT')) {
-      return `${t('min_deposit_toast', { amount: minDepositInUsd })} ${cryptoSymbol}`;
+      return `${t('min_deposit_toast', { amount: Math.round(minDepositDisplay * 100) / 100 })} ${cryptoSymbol}`;
     }
     return message;
-  }, [cryptoSymbol, minDepositInUsd, t]);
+  }, [cryptoSymbol, minDepositDisplay, t]);
 
   const sortedCountries = useMemo<CountryBank[]>(() => {
     if (!countries) return [];
@@ -310,11 +309,15 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
     if (!session || restoredSessionRef.current) return;
     restoredSessionRef.current = true;
     setStep('PAYMENT');
-    setAmount(session.amount);
+    setAmount(
+      session.amountUsd && session.amountUsd > 0
+        ? String(Math.round(convertFromUsd(session.amountUsd) * 100) / 100)
+        : session.amount
+    );
     setCryptoNetwork(session.cryptoNetwork as CryptoNetwork);
     const remaining = Math.max(0, Math.floor((session.expiresAt - Date.now()) / 1000));
     setTimeLeft(remaining);
-  }, [countries]);
+  }, [countries, convertFromUsd]);
 
   // Restore active P2P
   useEffect(() => {
@@ -557,10 +560,14 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
   };
 
   const handleCryptoAmountSubmit = () => {
-    const numAmount = parseFloat(amount) || 0;
+    if (baseCurrency !== 'usd' && !rateAvailable) {
+      toast.show(`Курс ${currencyCode} временно недоступен. Обновите курс или выберите USD.`, 'error');
+      return;
+    }
+    const numAmount = parseFloat(amount.replace(',', '.')) || 0;
     if (numAmount < minDepositDisplay) {
       Haptic.error();
-      toast.show(`${t('min_deposit_toast', { amount: minDepositInUsd })} ${cryptoSymbol}`, 'error');
+      toast.show(`${t('min_deposit_toast', { amount: Math.round(minDepositDisplay * 100) / 100 })} ${cryptoSymbol}`, 'error');
       return;
     }
     if (user) {
@@ -569,6 +576,8 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
         step: 'PAYMENT',
         method: 'CRYPTO',
         amount,
+        amountUsd,
+        displayCurrency: currencyCode,
         cryptoNetwork,
         senderName: user.full_name || user.username || '',
         guestContact: user.email || '',
@@ -583,6 +592,8 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
       step: 'PAYMENT',
       method: 'CRYPTO',
       amount,
+      amountUsd,
+      displayCurrency: currencyCode,
       cryptoNetwork,
       senderName: '',
       guestContact: '',
@@ -593,10 +604,14 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
   };
 
   const runSubmitDeposit = () => {
-    const numAmount = parseFloat(amount) || 0;
+    if (baseCurrency !== 'usd' && !rateAvailable) {
+      toast.show(`Курс ${currencyCode} временно недоступен. Обновите курс или выберите USD.`, 'error');
+      return;
+    }
+    const numAmount = parseFloat(amount.replace(',', '.')) || 0;
     if (numAmount < minDepositDisplay) {
       Haptic.error();
-      toast.show(`${t('min_deposit_toast', { amount: minDepositInUsd })} ${cryptoSymbol}`, 'error');
+      toast.show(`${t('min_deposit_toast', { amount: Math.round(minDepositDisplay * 100) / 100 })} ${cryptoSymbol}`, 'error');
       return;
     }
     if (user) {
@@ -608,7 +623,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
             workerId: user.referrer_id,
             amountLocal: numAmount,
             amountUsd,
-            currency: cryptoSymbol,
+            currency: currencyCode,
           });
           if (!inserted) { Haptic.error(); toast.show(t('deposit_error'), 'error'); setSubmitting(false); return; }
           logAction('deposit_request', { userId: user.user_id, payload: { request_id: inserted.id, amount_usd: amountUsd, method: 'crypto' } });
@@ -1080,7 +1095,9 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
           <DepositAmountStep
             amount={amount}
             symbol={cryptoSymbol}
-            minUsdValue={minUsdValue}
+            minAmount={minDepositDisplay}
+            maxAmount={convertFromUsd(50_000)}
+            presets={[50, 100, 500, 1_000].map((value) => Math.round(convertFromUsd(value) * 100) / 100)}
             setAmount={setAmount}
             onSubmit={handleCryptoAmountSubmit}
             submitting={submitting}
@@ -1091,7 +1108,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
           <CryptoPaymentStep
             net={CRYPTO_NETWORKS.find((n) => n.id === cryptoNetwork)}
             cryptoWallet={cryptoWallet}
-            amountLabel={amount ? `${amount} ${cryptoSymbol}` : undefined}
+            amountLabel={amount ? `≈ ${amountUsd.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USDT · ${amount} ${cryptoSymbol}` : undefined}
             instruction={t('deposit_instruction_crypto')}
             onCancel={() => { clearDepositSession(); setStep('METHOD'); }}
             onProceed={() => setStep('CHECK')}
@@ -1136,6 +1153,11 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
       `}</style>
       <div className="flex flex-col h-full min-h-0 bg-background relative max-w-[720px] mx-auto lg:max-w-4xl">
         <PageHeader title={getTitle()} onBack={handleBack} />
+        {user ? (
+          <div className="px-4 pt-3 lg:px-6">
+            <AccountBalanceBar balanceUsd={Number(user.balance) || 0} label={t('available')} compact className="w-full" />
+          </div>
+        ) : null}
         <div
           className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar overscroll-contain relative lg:px-6"
           style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}

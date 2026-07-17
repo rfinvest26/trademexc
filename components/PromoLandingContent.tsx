@@ -21,7 +21,7 @@ const proofCards = [
   {
     title: 'Asset Safety',
     value: '3 pillars',
-    caption: 'KYC, reserves mindset and support flow',
+    caption: 'Risk controls, reserve policy and support flow',
     Icon: LockKeyhole,
   },
 ];

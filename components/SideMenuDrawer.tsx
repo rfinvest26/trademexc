@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   User,
-  ShieldCheck,
   MessageCircle,
   Languages,
   LogOut,
@@ -101,19 +100,6 @@ const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({ onNavigate }) => {
             </div>
             <span className="flex-1 text-left text-sm text-textPrimary">{t('profile') || 'Профиль'}</span>
             <ChevronRight size={15} className="text-textSubtle shrink-0" />
-          </button>
-
-          <button type="button" className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-surfaceElevated transition-colors" onClick={() => navigate('KYC')}>
-            <div className="w-8 h-8 rounded-xl bg-surfaceElevated flex items-center justify-center shrink-0">
-              <ShieldCheck size={16} className="text-textSecondary" />
-            </div>
-            <span className="flex-1 text-left text-sm text-textPrimary">{t('kyc_title') || 'Верификация'}</span>
-            {!user?.is_kyc && (
-              <span className="text-[10px] font-semibold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">
-                {t('required') || 'Нужна'}
-              </span>
-            )}
-            <ChevronRight size={15} className="text-textSubtle shrink-0 ml-1" />
           </button>
 
           <button type="button" className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-surfaceElevated transition-colors" onClick={() => navigate('SUPPORT')}>

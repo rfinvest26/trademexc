@@ -31,6 +31,7 @@ import {
   type NftListingRow,
 } from '../lib/nftCatalog';
 import { getMyNftOwned, nftOwnedStatusMeta, type NftOwnedRow, type NftStatusTone } from '../lib/nftOrders';
+import AccountBalanceBar from '../components/AccountBalanceBar';
 
 interface DealsPageProps {
   deals: Deal[];
@@ -308,12 +309,12 @@ const DealsPage: React.FC<DealsPageProps> = ({
   const dayChangeUsd = useMemo(() => {
     const spotCrypto = spotRows.reduce(
       (s, r) =>
-        s + (r.valueUsd ?? 0) * (((assetsByTicker[r.holding.ticker]?.change24h ?? 0) as number) / 100),
+        s + (r?.valueUsd ?? 0) * (((assetsByTicker[r?.holding?.ticker || '']?.change24h ?? 0) as number) / 100),
       0
     );
     const nftDay = nftPortfolioRows.reduce((s, r) => {
-      const chTicker = (r.ticker ? assetsByTicker[r.ticker]?.change24h : undefined) ?? assetsByTicker.ETH?.change24h ?? 0;
-      return s + (r.valueUsd ?? 0) * ((chTicker as number) / 100);
+      const chTicker = (r?.ticker ? assetsByTicker[r.ticker]?.change24h : undefined) ?? assetsByTicker.ETH?.change24h ?? 0;
+      return s + (r?.valueUsd ?? 0) * ((chTicker as number) / 100);
     }, 0);
     return spotCrypto + nftDay;
   }, [spotRows, nftPortfolioRows, assetsByTicker]);
@@ -416,6 +417,14 @@ const DealsPage: React.FC<DealsPageProps> = ({
             </div>
           )}
         </div>
+
+        <AccountBalanceBar
+          balanceUsd={balance}
+          loading={balanceLoading}
+          label={t('available')}
+          compact
+          className="mt-3 w-full"
+        />
 
         {/* Actions row */}
         <div className="mt-4 flex items-center gap-2">

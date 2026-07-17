@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import AssetTable from '../components/AssetTable';
 import Skeleton from '../components/Skeleton';
@@ -7,13 +7,13 @@ import { Asset, PageView, type NavigateToTradingOptions } from '../types';
 import { useLiveAssets } from '../utils/useLiveAssets';
 import { ArrowDownLeft, ArrowUpRight, Gem, Plus, User } from 'lucide-react';
 import { Haptic } from '../utils/haptics';
-import { useCurrency } from '../context/CurrencyContext';
 import { useHideOnScroll } from '../utils/useHideOnScroll';
 import BottomSheet from '../components/BottomSheet';
 import CryptoBannerWidget from '../components/CryptoBannerWidget';
 import { fetchActiveWorkerEvent } from '../lib/services/userService';
 import MarketTopBar from '../components/MarketTopBar';
 import TopSearchControl from '../components/TopSearchControl';
+import AccountBalanceBar from '../components/AccountBalanceBar';
 
 interface HomePageProps {
   balance: number;
@@ -34,29 +34,9 @@ const HomePage: React.FC<HomePageProps> = ({
   onNavigate,
 }) => {
   const { t } = useLanguage();
-  const { formatPrice, currencyCode } = useCurrency();
   const liveAssets = useLiveAssets(MOCK_ASSETS);
 
   const topBarHidden = useHideOnScroll();
-  const prevBalance = useRef<number | null>(null);
-  const [balanceFlash, setBalanceFlash] = useState('');
-
-  useEffect(() => {
-    if (prevBalance.current !== null && prevBalance.current !== balance) {
-      const cls = balance > prevBalance.current ? 'value-flash-up' : 'value-flash-down';
-      setBalanceFlash(cls);
-      const id = window.setTimeout(() => setBalanceFlash(''), 350);
-      prevBalance.current = balance;
-      return () => window.clearTimeout(id);
-    }
-    prevBalance.current = balance;
-  }, [balance]);
-
-  const totalAssetsText = useMemo(() => {
-    const n = Number(balance);
-    if (!Number.isFinite(n) || n <= 0) return '0';
-    return formatPrice(n, { fractionDigits: n < 1 ? 4 : 0 });
-  }, [balance, formatPrice]);
 
   const [promoTick, setPromoTick] = useState(0);
   useEffect(() => {
@@ -122,19 +102,12 @@ const HomePage: React.FC<HomePageProps> = ({
         {/* Balance + Deposit */}
         <section className="pt-4 pb-5">
         <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex flex-col gap-1">
-            <span className="text-textMuted text-xs font-medium">{t('home_total_assets')}</span>
-            <div className="flex items-baseline gap-2">
-              {balanceLoading ? (
-                <Skeleton className="w-32 h-9 rounded-lg bg-surface" />
-              ) : (
-                <span className={`text-[32px] font-bold tracking-tight text-ink tabular-nums leading-none rounded-lg ${balanceFlash}`}>
-                  {totalAssetsText}
-                </span>
-              )}
-              <span className="text-sm font-semibold text-textMuted uppercase tracking-wider">{currencyCode}</span>
-            </div>
-          </div>
+          <AccountBalanceBar
+            balanceUsd={balance}
+            loading={balanceLoading}
+            label={t('home_total_assets')}
+            className="min-w-0 flex-1 max-w-md"
+          />
 
           <button
             type="button"

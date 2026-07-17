@@ -16,7 +16,6 @@ const WithdrawPage = lazy(() => import('./pages/WithdrawPage'));
 const QRScannerPage = lazy(() => import('./pages/QRScannerPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const SupportPage = lazy(() => import('./pages/SupportPage'));
-const KycPage = lazy(() => import('./pages/KycPage'));
 import { PageView, Asset, Deal, type NavigateToTradingOptions } from './types';
 import { MOCK_ASSETS, MARKET_ASSETS } from './constants';
 import { useLiveAssets } from './utils/useLiveAssets';
@@ -58,12 +57,11 @@ function LocaleCurrencySync() {
     if (user) {
       const loc = (user.preferred_locale || 'en').toLowerCase();
       if (['en', 'ru', 'uk', 'pl', 'kk', 'cs'].includes(loc)) setLocale(loc as Locale);
-      setBaseCurrency('usd');
+      setBaseCurrency(user.preferred_currency || 'usd');
     } else {
       setLocale('en');
-      setBaseCurrency('usd');
     }
-  }, [user?.preferred_locale, setLocale, setBaseCurrency]);
+  }, [user?.preferred_locale, user?.preferred_currency, setLocale, setBaseCurrency]);
   return null;
 }
 
@@ -134,7 +132,6 @@ const AppContent: React.FC = () => {
     'WITHDRAW',
     'DEALS',
     'PROFILE',
-    'KYC',
     'SUPPORT',
   ];
 
@@ -310,7 +307,6 @@ const AppContent: React.FC = () => {
         'WITHDRAW',
         'QR_SCANNER',
         'PROFILE',
-        'KYC',
         'LANGUAGE',
         'SUPPORT',
         'NFT',
@@ -719,14 +715,11 @@ const AppContent: React.FC = () => {
           <ProfilePage
             deals={deals}
             onBack={() => navigateBack('HOME')}
-            onNavigateToKyc={() => navigateTo('KYC')}
             onNavigateToLanguage={() => navigateTo('LANGUAGE')}
             onNavigateToSupport={() => navigateTo('SUPPORT')}
             onNavigateToNft={() => navigateTo('NFT')}
           />
         );
-      case 'KYC':
-        return <KycPage onBack={() => navigateBack('PROFILE')} />;
       case 'LANGUAGE':
         return <LanguagePickerPage onBack={() => navigateBack('PROFILE')} />;
       case 'SUPPORT':

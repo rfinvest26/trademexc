@@ -18,7 +18,6 @@ export type AppActionType =
   | 'spot_buy'
   | 'spot_sell'
   | 'stake'
-  | 'kyc_submit'
   | 'pin_create'
   | 'pin_change'
   | 'currency_change'
@@ -78,7 +77,6 @@ const ACTION_LABELS: Record<AppActionType, string> = {
   spot_buy: 'Покупка спота',
   spot_sell: 'Продажа спота',
   stake: 'Стейкинг',
-  kyc_submit: 'KYC',
   pin_create: 'Создание PIN',
   pin_change: 'Изменение PIN',
   currency_change: 'Смена валюты',

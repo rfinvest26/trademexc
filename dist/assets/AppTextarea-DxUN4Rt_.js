@@ -1,0 +1,1 @@
+import{R as a,b as l}from"./vendor-h8BnuVpc.js";const o=a.forwardRef(({className:e,size:r="md",invalid:p=!1,borderless:t=!1,...s},m)=>a.createElement("textarea",{ref:m,className:l("app-textarea",r==="sm"&&"app-textarea-sm",t&&"app-input-borderless",p&&"app-input-error",e),...s}));o.displayName="AppTextarea";export{o as A};

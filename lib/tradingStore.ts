@@ -78,7 +78,12 @@ export function loadRiskSettings(): TradingRiskSettings {
   }
   const parsed = safeParse<TradingRiskSettings>(window.localStorage.getItem(LS_RISK));
   if (!parsed || parsed.version !== 1) return defaultRiskSettings();
-  return { ...defaultRiskSettings(), ...parsed };
+  const legacy = parsed as TradingRiskSettings & { maxOrderSizeRub?: number };
+  return {
+    ...defaultRiskSettings(),
+    ...parsed,
+    maxOrderSizeUsd: Number(legacy.maxOrderSizeUsd ?? legacy.maxOrderSizeRub ?? 0) || 0,
+  };
 }
 
 export function saveRiskSettings(next: TradingRiskSettings): void {
@@ -94,7 +99,7 @@ function defaultRiskSettings(): TradingRiskSettings {
     riskMode: 'fixedAmount',
     riskPercent: 0.02,
     maxLeverage: 200,
-    maxOrderSizeRub: 0,
+    maxOrderSizeUsd: 0,
     confirmMarketOrders: true,
     defaultOrderType: 'market',
     showAdvancedFields: false,
@@ -144,4 +149,3 @@ export function appendOrderHistory(entry: OrderHistoryEntry): OrderHistoryEntry[
   writeArray(LS_HISTORY, next);
   return next;
 }
-

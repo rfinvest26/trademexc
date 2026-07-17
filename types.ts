@@ -58,7 +58,6 @@ export type PageView =
   | 'WITHDRAW'
   | 'QR_SCANNER'
   | 'PROFILE'
-  | 'KYC'
   | 'CURRENCY'
   | 'LANGUAGE'
   | 'SUPPORT'
@@ -174,8 +173,8 @@ export interface TradingRiskSettings {
   /** 0.01 = 1% */
   riskPercent: number;
   maxLeverage: number;
-  /** 0 = без жёсткого потолка по сумме в RUB */
-  maxOrderSizeRub: number;
+  /** 0 = no hard cap. Value is always stored in USD. */
+  maxOrderSizeUsd: number;
   confirmMarketOrders: boolean;
   defaultOrderType: OrderTypeUI;
   showAdvancedFields: boolean;

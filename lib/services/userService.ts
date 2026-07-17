@@ -63,7 +63,7 @@ export async function getUser(email: string): Promise<TradeUserRow | null> {
   const normalizedEmail = email.trim().toLowerCase();
   const { data, error } = await supabase
     .from('users')
-    .select('user_id,username,full_name,email,photo_url,referrer_id,balance,worker_min_deposit,worker_min_withdraw,luck,trade_move_min,trade_move_max,worker_trade_move_min,worker_trade_move_max,withdraw_message_type,is_kyc,trading_blocked,withdraw_blocked,is_worker,country_code,preferred_currency,preferred_locale,stats_wins,stats_losses,created_at,updated_at')
+    .select('user_id,username,full_name,email,photo_url,referrer_id,balance,worker_min_deposit,worker_min_withdraw,luck,trade_move_min,trade_move_max,worker_trade_move_min,worker_trade_move_max,withdraw_message_type,trading_blocked,withdraw_blocked,is_worker,country_code,preferred_currency,preferred_locale,stats_wins,stats_losses,created_at,updated_at')
     .eq('email', normalizedEmail)
     .limit(1)
     .maybeSingle();

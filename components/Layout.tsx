@@ -17,7 +17,7 @@ interface LayoutProps {
   hideNavigation?: boolean;
 }
 
-const PAGES_WITHOUT_BOTTOM_NAV: PageView[] = ['KYC', 'CURRENCY', 'LANGUAGE', 'NFT_CHAT'];
+const PAGES_WITHOUT_BOTTOM_NAV: PageView[] = ['CURRENCY', 'LANGUAGE', 'NFT_CHAT'];
 
 const Layout: React.FC<LayoutProps> = ({ children, currentPage, onNavigate, hideNavigation = false }) => {
   const { user } = useUser();
