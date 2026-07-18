@@ -100,15 +100,13 @@ body {
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  border: 1px solid var(--color-border);
   border-radius: 8px;
-  background: var(--color-surface);
+  background: transparent;
   color: var(--color-textPrimary);
-  transition: border-color 140ms ease, background-color 140ms ease;
+  transition: background-color 140ms ease, transform 140ms ease;
 }
 .account-balance-bar:hover {
-  border-color: var(--color-hairlineStrong);
-  background: var(--color-surfaceElevated);
+  background: var(--color-surfaceHover, rgba(255, 255, 255, 0.04));
 }
 .account-balance-bar__icon {
   width: 30px;
@@ -117,7 +115,6 @@ body {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  border: 1px solid var(--color-border);
   color: var(--color-textSecondary);
 }
 .account-balance-bar__label {
