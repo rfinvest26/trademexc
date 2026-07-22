@@ -101,21 +101,20 @@ const CRYPTO_NETWORKS: CryptoNetworkOption[] = [
 ];
 
 const COUNTRY_FLAGS: Record<string, string> = {
-  RU: '🇷🇺', KZ: '🇰🇿', PL: '🇵🇱', UA: '🇺🇦',
+  RU: '🇷🇺', KZ: '🇰🇿',
   DE: '🇩🇪', US: '🇺🇸', GB: '🇬🇧', TR: '🇹🇷',
-  BY: '🇧🇾', UZ: '🇺🇿', AZ: '🇦🇿',
+  BY: '🇧🇾', UZ: '🇺🇿', AZ: '🇦🇿', TJ: '🇹🇯',
 };
 
 const SELLERS_BY_COUNTRY: Record<string, string[]> = {
   RU: ['Александр К.', 'Dmitry_P2P', 'crypto_alex77', 'Виктор С.', 'Maria_Trade', 'TradePro_RU', 'Pavel_Finance', 'Sergei_PRO', 'Nikita_FX', 'Oleg_Crypto', 'Anna_P2P', 'Max_Trader', 'Igor_Finance', 'Elena_Trade', 'Ruslan_Pro'],
   KZ: ['Nurasyl_KZ', 'AstanaTrader', 'Damir_P2P', 'kz_crypto_pro', 'Алибек Д.', 'Beibit_Trade', 'KZ_MoneyPro', 'Aibek_Finance', 'Zarina_Trade', 'Nursultan_P2P'],
-  PL: ['Pawel_Trade', 'crypto_pl_77', 'Warsaw_P2P', 'Marek_Pro', 'Anna_Trade', 'PLN_Master', 'Krakow_Crypto', 'Tomasz_FX', 'Piotr_Finance', 'Katarzyna_P2P'],
-  UA: ['Andrii_UA', 'Kyiv_Trader', 'ua_crypto', 'Dmytro_P2P', 'Olena_Trade', 'UkrCrypto', 'Lviv_P2P', 'Mykola_Finance', 'Oksana_Trade', 'Vasyl_Pro'],
   DE: ['Hans_Trade', 'Berlin_P2P', 'crypto_de_88', 'Klaus_Finance', 'DE_Trader', 'Euro_Pro', 'Frankfurt_C', 'Stefan_FX', 'Lukas_Trade', 'Mia_Finance'],
   TR: ['Ahmet_Trade', 'Istanbul_P2P', 'tr_crypto_pro', 'Mehmet_Finance', 'TR_Trader', 'Ankara_P2P', 'Emre_FX', 'Fatih_Trade', 'Selin_Pro', 'Burak_Finance'],
   BY: ['Vitaly_BY', 'Minsk_Trader', 'by_crypto', 'Artem_P2P', 'Natasha_Trade', 'BelCrypto', 'Grodno_P2P'],
   UZ: ['Bobur_UZ', 'Tashkent_P2P', 'uz_crypto', 'Jasur_Trade', 'Malika_Finance', 'UzCrypto', 'Samarkand_P2P'],
   AZ: ['Elchin_AZ', 'Baku_Trader', 'az_crypto', 'Nigar_P2P', 'Rashad_Trade', 'AzCrypto', 'Ganja_P2P'],
+  TJ: ['Rustam_TJ', 'Dushanbe_P2P', 'tj_crypto', 'Alisher_Trade', 'Zarina_Finance', 'TjCrypto', 'Khujand_P2P'],
 };
 
 const DEFAULT_SELLERS = ['Александр К.', 'TraderPro99', 'CryptoPro', 'FastP2P', 'Maria_Finance', 'TradeMaster_24', 'P2P_Expert'];

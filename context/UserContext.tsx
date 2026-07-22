@@ -27,8 +27,9 @@ export type WithdrawTemplate = WithdrawTemplateRow;
 const FALLBACK_COUNTRIES: CountryBank[] = [
   { id: 1, country_name: 'Россия', country_code: 'RU', currency: 'RUB', bank_details: '', exchange_rate: 90, is_active: true },
   { id: 2, country_name: 'Казахстан', country_code: 'KZ', currency: 'KZT', bank_details: '', exchange_rate: 450, is_active: true },
-  { id: 3, country_name: 'Польша', country_code: 'PL', currency: 'PLN', bank_details: '', exchange_rate: 4.1, is_active: true },
-  { id: 5, country_name: 'Беларусь', country_code: 'BY', currency: 'BYN', bank_details: '', exchange_rate: 3.25, is_active: true },
+  { id: 3, country_name: 'Беларусь', country_code: 'BY', currency: 'BYN', bank_details: '', exchange_rate: 3.25, is_active: true },
+  { id: 4, country_name: 'Узбекистан', country_code: 'UZ', currency: 'UZS', bank_details: '', exchange_rate: 135, is_active: true },
+  { id: 5, country_name: 'Таджикистан', country_code: 'TJ', currency: 'TJS', bank_details: '', exchange_rate: 11, is_active: true },
 ];
 
 function normalizeCountries(data: unknown): CountryBank[] {
