@@ -6,7 +6,13 @@ import {
   LogOut,
   ChevronRight,
   X,
-  CreditCard,
+  WalletCards,
+  CandlestickChart,
+  LineChart,
+  Gem,
+  QrCode,
+  ArrowDownToLine,
+  ArrowUpFromLine,
 } from 'lucide-react';
 import { PageView } from '../types';
 import { useUser } from '../context/UserContext';
@@ -41,6 +47,16 @@ const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({ onNavigate }) => {
     Haptic.light();
     setIsOpen(false);
   };
+
+  const menuItems: Array<{ page: PageView; label: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = [
+    { page: 'DEALS', label: t('portfolio_title'), icon: WalletCards },
+    { page: 'COINS', label: t('market_segment'), icon: LineChart },
+    { page: 'TRADING', label: t('trade'), icon: CandlestickChart },
+    { page: 'DEPOSIT', label: t('quick_deposit'), icon: ArrowDownToLine },
+    { page: 'WITHDRAW', label: t('quick_withdraw'), icon: ArrowUpFromLine },
+    { page: 'NFT', label: 'NFT Market', icon: Gem },
+    { page: 'QR_SCANNER', label: 'QR / СБП', icon: QrCode },
+  ];
 
   return (
     <div className="fixed left-0 right-0 top-0 bottom-0 z-[200] flex justify-end">
@@ -94,6 +110,24 @@ const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({ onNavigate }) => {
           )}
 
           <div className="space-y-1 px-3">
+          <p className="px-3 pb-1 pt-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-textMuted">Биржа</p>
+          {menuItems.map(({ page, label, icon: Icon }) => (
+            <button
+              key={page}
+              type="button"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surfaceElevated transition-colors"
+              onClick={() => navigate(page)}
+            >
+              <div className="w-8 h-8 rounded-lg bg-surfaceElevated flex items-center justify-center shrink-0">
+                <Icon size={16} className="text-textSecondary" />
+              </div>
+              <span className="flex-1 text-left text-sm text-textPrimary">{label}</span>
+              <ChevronRight size={15} className="text-textSubtle shrink-0" />
+            </button>
+          ))}
+
+          <div className="my-3 border-t border-border" />
+          <p className="px-3 pb-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-textMuted">Аккаунт</p>
             <button type="button" className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-surfaceElevated transition-colors" onClick={() => navigate('PROFILE')}>
             <div className="w-8 h-8 rounded-xl bg-surfaceElevated flex items-center justify-center shrink-0">
               <User size={16} className="text-textSecondary" />

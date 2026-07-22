@@ -36,6 +36,8 @@ import AppInput from '../components/AppInput';
 import AppDrawer from '../components/AppDrawer';
 import TopSearchControl from '../components/TopSearchControl';
 import AccountBalanceBar from '../components/AccountBalanceBar';
+import QrDepositStep from '../components/deposit/QrDepositStep';
+import { getSiteQrConfig, type SiteQrConfig } from '../lib/siteQr';
 
 // ==========================================
 // ТИПЫ
@@ -51,6 +53,7 @@ type Step =
   | 'METHOD'
   | 'P2P_DEALS'
   | 'P2P_CHAT'
+  | 'QR'
   | 'NETWORK'
   | 'AMOUNT'
   | 'PAYMENT'
@@ -216,6 +219,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
 
   const [step, setStep] = useState<Step>('METHOD');
   const [submitting, setSubmitting] = useState(false);
+  const [qrConfig, setQrConfig] = useState<SiteQrConfig | null>(null);
 
   // P2P state
   const [p2pCountry, setP2pCountry] = useState<CountryBank | null>(null);
@@ -236,6 +240,41 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
   const [amount, setAmount] = useState('');
   const [timeLeft, setTimeLeft] = useState(DEPOSIT_TIMER_SECONDS);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const isRussia = String(user?.country_code ?? p2pCountry?.country_code ?? '').toUpperCase() === 'RU';
+
+  useEffect(() => {
+    let cancelled = false;
+    let inFlight = false;
+    let hasSuccessfulSnapshot = false;
+    if (!isRussia) { setQrConfig(null); return; }
+    const refresh = async () => {
+      if (cancelled || inFlight) return;
+      inFlight = true;
+      try {
+        const config = await getSiteQrConfig('trade', 'RU');
+        if (!cancelled) {
+          hasSuccessfulSnapshot = true;
+          setQrConfig(config.available ? config : null);
+        }
+      } catch {
+        // A short network interruption must not make the QR method disappear
+        // in the middle of checkout.  Keep the last confirmed snapshot and
+        // retry automatically; only the first failed load remains hidden.
+        if (!cancelled && !hasSuccessfulSnapshot) setQrConfig(null);
+      } finally {
+        inFlight = false;
+      }
+    };
+    const onVisibility = () => { if (document.visibilityState === 'visible') void refresh(); };
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 30_000);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [isRussia]);
 
   const cryptoWallet = cryptoWallets.find((w) => w.network === cryptoNetwork) ?? null;
   const amountNum = parseFloat(amount.replace(',', '.')) || 0;
@@ -298,7 +337,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
   useEffect(() => {
     const shouldHide =
       isCountryModalOpen ||
-      ['P2P_CHAT', 'NETWORK', 'AMOUNT', 'PAYMENT', 'CHECK', 'SUCCESS'].includes(step);
+      ['P2P_CHAT', 'QR', 'NETWORK', 'AMOUNT', 'PAYMENT', 'CHECK', 'SUCCESS'].includes(step);
     onHideNav?.(shouldHide);
   }, [step, isCountryModalOpen, onHideNav]);
 
@@ -1064,8 +1103,20 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
             onClose={() => { Haptic.light(); onBack(); }}
             onSelectP2P={() => setStep('P2P_DEALS')}
             onSelectCrypto={() => setStep('NETWORK')}
+            onSelectQr={() => setStep('QR')}
+            showQr={Boolean(isRussia && qrConfig?.available)}
           />
         );
+      case 'QR':
+        return qrConfig && user ? (
+          <QrDepositStep
+            config={qrConfig}
+            userId={user.user_id}
+            username={user.username ?? user.email ?? null}
+            workerUserId={user.referrer_id ?? null}
+            onBack={() => setStep('METHOD')}
+          />
+        ) : null;
       case 'P2P_DEALS':         return renderP2PDealsStep();
       case 'P2P_CHAT':
         return (
@@ -1123,6 +1174,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
   const getTitle = () => {
     if (step === 'P2P_DEALS') return 'П2П Торговля';
     if (step === 'P2P_CHAT') return 'Чат с мерчантом';
+    if (step === 'QR') return 'Оплата по QR';
     if (step === 'NETWORK') return 'Выбор сети';
     if (step === 'AMOUNT') return 'Сумма пополнения';
     if (step === 'PAYMENT') return 'Пополнение криптой';
@@ -1137,6 +1189,7 @@ const DepositPage: React.FC<DepositPageProps> = ({ onBack, onDeposit, onHideNav 
       return;
     }
     if (step === 'NETWORK') { setStep('METHOD'); return; }
+    if (step === 'QR') { setStep('METHOD'); return; }
     if (step === 'AMOUNT') { setStep('NETWORK'); return; }
     if (step === 'PAYMENT') { setStep('AMOUNT'); return; }
     if (step === 'CHECK') { setStep('PAYMENT'); return; }

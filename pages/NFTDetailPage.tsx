@@ -20,6 +20,7 @@ import {
 } from '../components/appTopBar';
 import NftHorizontalStrip from '../components/NftHorizontalStrip';
 import NftOrderTicket from '../components/NftOrderTicket';
+import NftArtwork from '../components/NftArtwork';
 
 const MIN_DEAL_USD = 5;
 
@@ -501,14 +502,12 @@ const NFTDetailPage: React.FC<NFTDetailPageProps> = ({ listing, onBack, onOpenCh
           {/* Image Section — 55% on desktop */}
           <div className="w-full lg:w-[55%] shrink-0">
             <div className="rounded-xl overflow-hidden bg-surfaceElevated w-full aspect-square relative app-border">
-              <img
-                key={display.codeKey}
+              <NftArtwork
                 src={display.imageUrl}
-                alt=""
-                className="w-full h-full object-contain"
-                loading="eager"
-                decoding="async"
-                referrerPolicy="no-referrer"
+                alt={`${display.collectionName} ${display.codeDisplay}`}
+                eager
+                className="h-full w-full"
+                imageClassName="!p-3 lg:!p-5"
               />
             </div>
           </div>

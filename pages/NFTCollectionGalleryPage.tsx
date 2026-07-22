@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import NftArtwork from '../components/NftArtwork';
 import PageHeader from '../components/PageHeader';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
@@ -163,16 +164,11 @@ const NFTCollectionGalleryPage: React.FC<NFTCollectionGalleryPageProps> = ({
 
       {/* Cover banner — wide, full bleed */}
       <div className="relative w-full h-36 lg:h-52 overflow-hidden">
-        <img
-          src={coverUrl}
-          alt=""
-          className="absolute inset-0 z-10 w-full h-full object-cover object-[center_18%] scale-[1.04] lg:object-[center_14%]"
-          referrerPolicy="no-referrer"
-        />
+        <NftArtwork src={coverUrl} alt={collectionName} eager className="absolute inset-0 z-10 h-full w-full" imageClassName="!p-2 lg:!p-3" />
         <div className="absolute inset-0 z-20 bg-gradient-to-t from-background via-background/20 via-42% to-transparent" />
         {/* Avatar overlapping bottom of banner */}
         <div className="absolute left-5 lg:left-10 bottom-3 lg:bottom-4 z-30 w-16 h-16 lg:w-20 lg:h-20 rounded-xl overflow-hidden border-4 border-background bg-surfaceElevated shadow-xl">
-          <img src={coverUrl} alt={collectionName} className="w-full h-full object-cover object-[center_18%]" />
+          <NftArtwork src={coverUrl} alt={collectionName} className="h-full w-full" imageClassName="!p-0.5" />
         </div>
       </div>
 
@@ -232,13 +228,10 @@ const NFTCollectionGalleryPage: React.FC<NFTCollectionGalleryPageProps> = ({
                 className="nft-card group text-left w-full focus:outline-none"
               >
                 <div className="aspect-[4/5] bg-surface relative overflow-hidden">
-                  <img
+                  <NftArtwork
                     src={row.imageUrl}
-                    alt=""
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.08]"
-                    loading="lazy"
-                    decoding="async"
-                    referrerPolicy="no-referrer"
+                    alt={`${row.collectionName} ${row.codeDisplay}`}
+                    className="h-full w-full transition-transform duration-500 group-hover:scale-[1.02]"
                   />
 
                   {duoByTicker[nftTickerForListing(row)] ? (

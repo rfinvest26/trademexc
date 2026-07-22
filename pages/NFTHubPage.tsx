@@ -26,6 +26,7 @@ import NftOrderTicket from '../components/NftOrderTicket';
 import AppInput from '../components/AppInput';
 import TopSearchControl from '../components/TopSearchControl';
 import { fetchAssetPricesInUsd } from '../lib/cryptoPrices';
+import NftArtwork from '../components/NftArtwork';
 
 interface NFTHubPageProps {
   onOpenCollection: (slug: string) => void;
@@ -156,9 +157,7 @@ const NftSparkChart: React.FC<{ collection: NftCollectionSummary; ethUsd: number
             ${floorUsd.toLocaleString('en-US', { maximumFractionDigits: floorUsd >= 100 ? 0 : 2 })}
           </div>
         </div>
-        <div className="h-9 w-9 rounded-xl bg-background/50 overflow-hidden shrink-0">
-          <img src={collection.coverUrl} alt="" className="h-full w-full object-cover object-top" loading="lazy" referrerPolicy="no-referrer" />
-        </div>
+        <NftArtwork src={collection.coverUrl} className="h-9 w-9 shrink-0 rounded-lg" />
       </div>
       <svg viewBox="0 0 178 54" className="mt-3 h-[54px] w-full overflow-visible" aria-hidden>
         <defs>
@@ -568,9 +567,7 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
                               onClick={() => openListing(row)}
                               className="w-full text-left flex items-center gap-3 rounded-xl app-border bg-background/60 p-2.5 active:scale-[0.99] transition-transform hover:bg-surfaceElevated"
                             >
-                              <div className="h-12 w-12 rounded-xl overflow-hidden bg-surface shrink-0">
-                                <img src={row.imageUrl} alt="" className="h-full w-full object-cover object-top" loading="lazy" referrerPolicy="no-referrer" />
-                              </div>
+                              <NftArtwork src={row.imageUrl} alt={`${row.collectionName} ${row.codeDisplay}`} className="h-12 w-12 shrink-0 rounded-lg" />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span className="font-mono text-[13px] font-bold text-textPrimary shrink-0">{row.codeDisplay}</span>
@@ -600,9 +597,7 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
                             onClick={() => { Haptic.medium(); onOpenCollection(collection.slug); }}
                             className="rounded-xl app-border bg-background/60 p-2 text-left active:scale-[0.99] transition-transform hover:bg-surfaceElevated"
                           >
-                            <div className="aspect-[1.8] rounded-lg overflow-hidden bg-surface mb-2">
-                              <img src={collection.coverUrl} alt="" className="h-full w-full object-cover object-top" loading="lazy" referrerPolicy="no-referrer" />
-                            </div>
+                            <NftArtwork src={collection.coverUrl} alt={collection.name} className="mb-2 aspect-[1.8] rounded-lg" imageClassName="!p-1" />
                             <div className="text-[12px] font-semibold text-textPrimary truncate">{collection.name}</div>
                             <div className="text-[10px] text-textMuted mt-0.5">Floor ◆ {collection.floorEth.toFixed(2)} · {collection.itemCount}</div>
                           </button>
@@ -625,9 +620,7 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
                           });
                           return (
                             <div key={`search-resale-${row.id}`} className="flex items-center gap-3 rounded-xl bg-background/55 p-2.5">
-                              <div className="w-11 h-11 rounded-xl overflow-hidden bg-surface shrink-0">
-                                {row.image_url && <img src={row.image_url} alt="" className="w-full h-full object-cover object-top" loading="lazy" referrerPolicy="no-referrer" />}
-                              </div>
+                              {row.image_url ? <NftArtwork src={row.image_url} className="h-11 w-11 shrink-0 rounded-lg" /> : <div className="h-11 w-11 shrink-0 rounded-lg bg-surface" />}
                               <div className="min-w-0 flex-1">
                                 <div className="text-[12px] font-semibold text-textPrimary truncate">
                                   {row.collection_name ?? 'NFT'} {row.nft_code ? `#${row.nft_code}` : ''}
@@ -693,7 +686,7 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
                 onClick={() => { Haptic.medium(); onOpenCollection(collections[0]!.slug); }}
                 className="relative w-full h-36 lg:h-56 rounded-xl overflow-hidden text-left group"
               >
-                <img src={collections[0]!.coverUrl} alt="" className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105" referrerPolicy="no-referrer" />
+                <NftArtwork src={collections[0]!.coverUrl} alt={collections[0]!.name} eager className="absolute inset-0 h-full w-full transition-transform duration-700 group-hover:scale-[1.015]" imageClassName="!p-2 lg:!p-3" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
                 <div className="absolute left-5 bottom-4 right-5">
                   <div className="text-[10px] font-bold uppercase tracking-widest text-accent mb-1">{t('nft_featured') || 'В центре внимания'}</div>
@@ -716,9 +709,7 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
                         onClick={() => { Haptic.medium(); onOpenCollection(c.slug); }}
                         className="nft-card group text-left w-full"
                       >
-                        <div className="aspect-square overflow-hidden relative">
-                          <img src={c.coverUrl} alt="" className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105" loading="lazy" referrerPolicy="no-referrer" />
-                        </div>
+                        <NftArtwork src={c.coverUrl} alt={c.name} className="aspect-square transition-transform duration-500 group-hover:scale-[1.02]" />
                         <div className="p-3">
                           <div className="flex items-center gap-1 mb-2">
                             <span className="text-[13px] font-bold text-textPrimary truncate">{c.name}</span>
@@ -754,9 +745,7 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
                             className="flex items-center gap-4 p-3 rounded-xl hover:bg-surfaceElevated transition-colors text-left w-full group"
                           >
                             <span className="text-sm font-bold text-textMuted w-4 text-center">{idx + 1}</span>
-                            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 relative">
-                              <img src={c.coverUrl} alt="" className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-110" loading="lazy" referrerPolicy="no-referrer" />
-                            </div>
+                            <NftArtwork src={c.coverUrl} alt={c.name} className="h-12 w-12 shrink-0 rounded-lg transition-transform duration-500 group-hover:scale-[1.03]" />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1">
                                 <span className="text-[15px] font-bold text-textPrimary truncate">{c.name}</span>
@@ -786,9 +775,7 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
                             onClick={() => { Haptic.medium(); onOpenCollection(c.slug); }}
                             className="nft-card group text-left w-full"
                           >
-                            <div className="aspect-square overflow-hidden relative">
-                              <img src={c.coverUrl} alt="" className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105" loading="lazy" referrerPolicy="no-referrer" />
-                            </div>
+                            <NftArtwork src={c.coverUrl} alt={c.name} className="aspect-square transition-transform duration-500 group-hover:scale-[1.02]" />
                             <div className="p-3">
                               <div className="flex items-center gap-1 mb-2">
                                 <span className="text-[13px] font-bold text-textPrimary truncate">{c.name}</span>
@@ -828,9 +815,7 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
                     });
                     return (
                       <div key={row.id} className="app-row gap-4">
-                        <div className="w-16 h-16 rounded-xl overflow-hidden bg-background shrink-0 shadow-sm">
-                          {row.image_url && <img src={row.image_url} alt="" className="w-full h-full object-cover object-top" loading="lazy" referrerPolicy="no-referrer" />}
-                        </div>
+                        {row.image_url ? <NftArtwork src={row.image_url} className="h-16 w-16 shrink-0 rounded-lg" /> : <div className="h-16 w-16 shrink-0 rounded-lg bg-background" />}
                         <div className="min-w-0 flex-1">
                           <div className="text-[15px] font-bold text-textPrimary truncate">
                             {row.collection_name ?? 'NFT'} {row.nft_code ? `#${row.nft_code}` : ''}
@@ -877,9 +862,7 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
                 : nftOwnedStatusMeta(row.status);
               return (
                 <div key={row.id} className="flex items-center gap-4 p-3 app-border rounded-xl bg-surface">
-                  <div className="w-16 h-16 rounded-xl overflow-hidden bg-background shrink-0 shadow-sm">
-                    {row.image_url && <img src={row.image_url} alt="" className="w-full h-full object-cover object-top" loading="lazy" referrerPolicy="no-referrer" />}
-                  </div>
+                  {row.image_url ? <NftArtwork src={row.image_url} className="h-16 w-16 shrink-0 rounded-lg" /> : <div className="h-16 w-16 shrink-0 rounded-lg bg-background" />}
                   <div className="min-w-0 flex-1">
                     <div className="text-[15px] font-bold text-textPrimary truncate">
                       {row.collection_name ?? 'NFT'} {row.nft_code ? `#${row.nft_code}` : ''}
@@ -977,7 +960,7 @@ const NFTHubPage: React.FC<NFTHubPageProps> = ({ onOpenCollection, onOpenListing
                   <div className="flex items-center gap-3">
                     <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-surface shrink-0">
                       {order.image_url ? (
-                        <img src={order.image_url} alt="" className="w-full h-full object-cover object-top" loading="lazy" referrerPolicy="no-referrer" />
+                        <NftArtwork src={order.image_url} className="h-full w-full" />
                       ) : (
                         <div className="h-full w-full flex items-center justify-center">
                           <Gem size={18} className="text-accent" />

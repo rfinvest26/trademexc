@@ -32,6 +32,7 @@ import {
 } from '../lib/nftCatalog';
 import { getMyNftOwned, nftOwnedStatusMeta, type NftOwnedRow, type NftStatusTone } from '../lib/nftOrders';
 import AccountBalanceBar from '../components/AccountBalanceBar';
+import NftArtwork from '../components/NftArtwork';
 
 interface DealsPageProps {
   deals: Deal[];
@@ -295,8 +296,14 @@ const DealsPage: React.FC<DealsPageProps> = ({
   }, [activeTab, userId]);
 
   const activeDeals = deals.filter((d) => d.status === 'ACTIVE').sort((a, b) => b.startTime - a.startTime);
+  const settledDeals = deals.filter((d) => d.status !== 'ACTIVE').sort((a, b) => b.startTime - a.startTime);
+  const nonTradeActivityHistory = activityHistory.filter((item) => item.activity_type !== 'trade');
   const totalActiveExposure = activeDeals.reduce((sum, d) => sum + d.amount, 0);
   const totalPnlActive = activeDeals.reduce((sum, d) => sum + (d.pnl ?? 0), 0);
+  const activeRoi = totalActiveExposure > 0 ? (totalPnlActive / totalActiveExposure) * 100 : 0;
+  const realizedPnl = settledDeals.reduce((sum, deal) => sum + (deal.pnl ?? 0), 0);
+  const wins = settledDeals.filter((deal) => deal.status === 'WIN').length;
+  const winRate = settledDeals.length > 0 ? (wins / settledDeals.length) * 100 : 0;
 
   const spotValueUsd = useMemo(
     () =>
@@ -366,7 +373,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
 
   const tabs: { id: TabId; label: string; count: number }[] = [
     { id: 'ACTIVE', label: t('active_tab'), count: activeDeals.length },
-    { id: 'HISTORY', label: t('history_tab'), count: activityHistory.length },
+    { id: 'HISTORY', label: t('history_tab'), count: settledDeals.length + nonTradeActivityHistory.length },
     { id: 'ASSETS', label: t('my_assets'), count: assetRowsCount },
   ];
 
@@ -407,12 +414,17 @@ const DealsPage: React.FC<DealsPageProps> = ({
             </div>
           </div>
 
-          {activeDeals.length > 0 && (
-            <div className="text-right shrink-0 rounded-xl bg-surfaceElevated/70 px-3 py-2">
-              <p className="text-[10px] uppercase tracking-wider text-textMuted">P&L</p>
-              <p className={`text-sm font-mono font-bold tabular-nums ${totalPnlActive >= 0 ? 'text-up' : 'text-down'}`}>
-                {totalPnlActive >= 0 ? '+' : ''}
-                {formatPrice(totalPnlActive)} {symbol}
+          {(activeDeals.length > 0 || settledDeals.length > 0) && (
+            <div className="text-right shrink-0 border-l border-border pl-3 py-1">
+              <p className="text-[9px] uppercase tracking-[0.16em] text-textMuted">{activeDeals.length > 0 ? 'Live P&L' : 'Realized P&L'}</p>
+              <p className={`text-sm font-mono font-bold tabular-nums ${(activeDeals.length > 0 ? totalPnlActive : realizedPnl) >= 0 ? 'text-up' : 'text-down'}`}>
+                {(activeDeals.length > 0 ? totalPnlActive : realizedPnl) >= 0 ? '+' : ''}
+                {formatPrice(activeDeals.length > 0 ? totalPnlActive : realizedPnl)} {symbol}
+              </p>
+              <p className={`text-[10px] font-mono tabular-nums ${activeDeals.length > 0 ? (activeRoi >= 0 ? 'text-up/80' : 'text-down/80') : 'text-textMuted'}`}>
+                {activeDeals.length > 0
+                  ? `${activeRoi >= 0 ? '+' : ''}${activeRoi.toFixed(2)}% ROI`
+                  : `${winRate.toFixed(1)}% WIN RATE`}
               </p>
             </div>
           )}
@@ -542,7 +554,10 @@ const DealsPage: React.FC<DealsPageProps> = ({
                           {isProfitable ? '+' : ''}
                           {formatPrice(deal.pnl ?? 0)}
                         </span>
-                        <span className="text-[10px] text-textMuted block">{symbol}</span>
+                        <span className={`text-[10px] font-mono block ${isProfitable ? 'text-up/75' : 'text-down/75'}`}>
+                          {(deal.pnl ?? 0) >= 0 ? '+' : ''}{deal.amount > 0 ? (((deal.pnl ?? 0) / deal.amount) * 100).toFixed(2) : '0.00'}%
+                        </span>
+                        <span className="text-[9px] text-textMuted block">Маржа: {formatPrice(deal.amount)} {symbol}</span>
                       </div>
                       <div className="text-right">
                         {deal.durationSeconds === 0 ? (
@@ -567,7 +582,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
         {/* ——— История операций ——— */}
         {activeTab === 'HISTORY' && (
           <div className="px-4 py-3">
-            {historyLoading && (
+            {historyLoading && settledDeals.length === 0 && (
               <div className="overflow-hidden rounded-xl bg-surfaceElevated">
                 {Array.from({ length: 3 }).map((_, idx) => (
                   <Skeleton key={`history-skeleton-${idx}`} className="w-full h-14 bg-surface" />
@@ -575,7 +590,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
               </div>
             )}
 
-            {!historyLoading && activityHistory.length === 0 && (
+            {!historyLoading && settledDeals.length === 0 && nonTradeActivityHistory.length === 0 && (
               <AppEmptyState
                 icon={History}
                 tone="neon"
@@ -584,21 +599,86 @@ const DealsPage: React.FC<DealsPageProps> = ({
               />
             )}
 
-            {!historyLoading && activityHistory.length > 0 && (
-              <div className="-mx-4">
-                {activityHistory.map((item) => {
+            {settledDeals.length > 0 && (
+              <section className="mb-5" aria-label="История сделок">
+                <div className="grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-border bg-border">
+                  <div className="bg-surface px-3 py-2.5">
+                    <p className="text-[9px] uppercase tracking-wider text-textMuted">Realized P&amp;L</p>
+                    <p className={`mt-1 truncate font-mono text-sm font-bold tabular-nums ${realizedPnl >= 0 ? 'text-up' : 'text-down'}`}>
+                      {realizedPnl >= 0 ? '+' : ''}{formatPrice(realizedPnl)} {symbol}
+                    </p>
+                  </div>
+                  <div className="bg-surface px-3 py-2.5">
+                    <p className="text-[9px] uppercase tracking-wider text-textMuted">Win rate</p>
+                    <p className="mt-1 font-mono text-sm font-bold text-textPrimary tabular-nums">{winRate.toFixed(1)}%</p>
+                  </div>
+                  <div className="bg-surface px-3 py-2.5">
+                    <p className="text-[9px] uppercase tracking-wider text-textMuted">Сделки</p>
+                    <p className="mt-1 font-mono text-sm font-bold text-textPrimary tabular-nums">{settledDeals.length}</p>
+                  </div>
+                </div>
+
+                <div className="mt-3 overflow-hidden rounded-lg border border-border bg-surface">
+                  <div className="hidden grid-cols-[minmax(0,1.2fr)_minmax(90px,.8fr)_minmax(90px,.8fr)_auto] gap-3 border-b border-border bg-surfaceElevated px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-textMuted sm:grid">
+                    <span>Инструмент / ID</span><span>Сумма сделки</span><span>P&amp;L</span><span>Исход</span>
+                  </div>
+                  {settledDeals.map((deal) => {
+                    const pnl = deal.pnl ?? 0;
+                    const isWin = deal.status === 'WIN';
+                    const roi = deal.amount > 0 ? (pnl / deal.amount) * 100 : 0;
+                    const tradeId = `MX-${String(deal.id).toUpperCase()}`;
+                    return (
+                      <article
+                        key={deal.id}
+                        className={`grid gap-3 border-b border-border px-3 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1.2fr)_minmax(90px,.8fr)_minmax(90px,.8fr)_auto] sm:items-center ${isWin ? 'bg-up/[0.018]' : 'bg-down/[0.018]'}`}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-sm font-bold text-textPrimary">{deal.assetTicker}</span>
+                            <span className={`text-[10px] font-semibold ${deal.side === 'UP' ? 'text-up' : 'text-down'}`}>
+                              {deal.side === 'UP' ? 'LONG' : 'SHORT'} · ×{deal.leverage}
+                            </span>
+                          </div>
+                          <p className="mt-1 truncate font-mono text-[9px] text-textMuted" title={tradeId}>#{tradeId}</p>
+                          <p className="mt-0.5 text-[10px] text-textSubtle">{formatHistoryDate(new Date(deal.startTime).toISOString())}</p>
+                        </div>
+                        <div className="flex items-end justify-between gap-2 sm:block">
+                          <span className="text-[9px] uppercase tracking-wider text-textMuted sm:block">Сумма сделки</span>
+                          <strong className="font-mono text-sm text-textPrimary tabular-nums">{formatPrice(deal.amount)} {symbol}</strong>
+                        </div>
+                        <div className="flex items-end justify-between gap-2 sm:block">
+                          <span className="text-[9px] uppercase tracking-wider text-textMuted sm:block">Прибыль / убыток</span>
+                          <strong className={`font-mono text-sm tabular-nums ${pnl >= 0 ? 'text-up' : 'text-down'}`}>
+                            {pnl >= 0 ? '+' : ''}{formatPrice(pnl)} {symbol}
+                          </strong>
+                          <span className={`ml-1 font-mono text-[10px] ${roi >= 0 ? 'text-up/75' : 'text-down/75'}`}>
+                            ({roi >= 0 ? '+' : ''}{roi.toFixed(2)}%)
+                          </span>
+                        </div>
+                        <div className="flex justify-end">
+                          <span className={`rounded px-2 py-1 font-mono text-[10px] font-bold ring-1 ${isWin ? 'bg-up/10 text-up ring-up/20' : 'bg-down/10 text-down ring-down/20'}`}>
+                            {isWin ? 'WIN' : 'LOSS'}
+                          </span>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {!historyLoading && nonTradeActivityHistory.length > 0 && (
+              <section>
+                <h3 className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-textMuted">Спотовые операции</h3>
+                <div className="-mx-4">
+                {nonTradeActivityHistory.map((item) => {
                   const labelMap: Record<string, string> = {
                     spot_buy: t('spot_buy'),
                     spot_sell: t('spot_sell'),
-                    trade: t('history_trade'),
                   };
-                  const label = labelMap[item.activity_type];
-                  const isGreen =
-                    item.activity_type === 'spot_buy' ||
-                    (item.activity_type === 'trade' && (item.amount_usd ?? 0) >= 0);
-                  const isRed =
-                    item.activity_type === 'spot_sell' ||
-                    (item.activity_type === 'trade' && (item.amount_usd ?? 0) < 0);
+                  const label = labelMap[item.activity_type] ?? item.activity_type;
+                  const isGreen = item.activity_type === 'spot_buy';
+                  const isRed = item.activity_type === 'spot_sell';
                   const ticker = item.ticker || (item.payload?.symbol as string) || '—';
                   const amountUsd = item.amount_usd ?? 0;
                   const quantity = item.quantity ?? 0;
@@ -624,12 +704,6 @@ const DealsPage: React.FC<DealsPageProps> = ({
                         <p className="text-[10px] text-textMuted mt-0.5">{formatHistoryDate(item.created_at)}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        {item.activity_type === 'trade' && (
-                          <span className={`font-mono text-sm font-bold tabular-nums ${amountUsd >= 0 ? 'text-up' : 'text-down'}`}>
-                            {amountUsd >= 0 ? '+' : ''}
-                            {formatPrice(amountUsd)} {symbol}
-                          </span>
-                        )}
                         {(item.activity_type === 'spot_buy' || item.activity_type === 'spot_sell') && (
                           <span className="font-mono text-sm text-textPrimary">{formatPrice(amountUsd)} {symbol}</span>
                         )}
@@ -640,7 +714,8 @@ const DealsPage: React.FC<DealsPageProps> = ({
                     </div>
                   );
                 })}
-              </div>
+                </div>
+              </section>
             )}
           </div>
         )}
@@ -744,13 +819,7 @@ const DealsPage: React.FC<DealsPageProps> = ({
                           >
                             <div className="h-12 w-12 shrink-0 rounded-xl bg-background/40 overflow-hidden relative">
                               {imageUrl ? (
-                                <img
-                                  src={imageUrl}
-                                  alt=""
-                                  className="absolute inset-0 h-full w-full object-cover"
-                                  loading="lazy"
-                                  referrerPolicy="no-referrer"
-                                />
+                                <NftArtwork src={imageUrl} className="absolute inset-0 h-full w-full" />
                               ) : (
                                 <div className="absolute inset-0 flex items-center justify-center text-[10px] font-mono text-textMuted">
                                   NFT

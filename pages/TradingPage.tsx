@@ -1653,7 +1653,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
 
             {/* График: edge-to-edge контейнер */}
             <div
-              className={`relative w-full bg-card overflow-hidden flex-1 min-h-[280px] md:min-h-[360px] lg:min-h-[420px] ${
+              className={`relative w-full bg-card overflow-hidden flex-1 min-h-[150px] sm:min-h-[210px] md:min-h-[300px] lg:min-h-[420px] ${
                 isFullscreen ? 'fixed left-0 right-0 top-0 bottom-0 chart-fullscreen transition-all duration-300 pt-12' : ''
               }`}
               style={
@@ -1740,14 +1740,14 @@ const TradingPage: React.FC<TradingPageProps> = ({
 
             {/* Combined bottom section with grid layout */}
             {!isFullscreen && (
-              <div className="relative z-40 lg:hidden">
+              <div className="relative z-40 mb-[calc(52px+env(safe-area-inset-bottom,0px))] shrink-0 border-t border-border bg-background lg:mb-0">
                 <div
                   className="pointer-events-auto nav-glass"
                   style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom, 0px))' }}
                 >
-                  <div className="px-3 py-2">
+                  <div className="px-3 py-2 lg:px-4 lg:py-2.5">
                     {/* Info row */}
-                    <div className="grid grid-cols-3 gap-2 mb-3">
+                    <div className="grid grid-cols-3 gap-2 mb-2 sm:grid-cols-6 lg:mb-2">
                       <div>
                         <div className="text-[9px] text-textMuted uppercase font-bold">{t('ticker')}</div>
                         <div className="text-xs font-mono text-white font-bold truncate">{getTradingViewSymbolLabelForAsset(asset)}</div>
@@ -1764,7 +1764,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
                           {(displayChange24h ?? 0) >= 0 ? '+' : ''}{(displayChange24h ?? 0).toFixed(2)}%
                         </div>
                       </div>
-                      <div>
+                      <div className="hidden sm:block">
                         <div className="text-[9px] text-textMuted uppercase font-bold">{t('volume_24h')}</div>
                         <div className="text-xs text-textSecondary truncate">
                           {asset.volume24h >= 1e9
@@ -1777,19 +1777,19 @@ const TradingPage: React.FC<TradingPageProps> = ({
                           {symbol}
                         </div>
                       </div>
-                      <div>
+                      <div className="hidden sm:block">
                         <div className="text-[9px] text-textMuted uppercase font-bold">{t('min_deal')}</div>
                         <div className="text-xs text-textSecondary">
                           {minDealText}
                         </div>
                       </div>
-                      <div>
+                      <div className="hidden sm:block">
                         <div className="text-[9px] text-textMuted uppercase font-bold">{t('provider')}</div>
                         <div className="text-xs text-neon">{provider}</div>
                       </div>
                     </div>
                     {/* Button row */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 lg:max-w-xl">
                       <button
                         type="button"
                         onClick={() => {
@@ -1798,7 +1798,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
                           setTradeType('futures');
                           setSide('UP');
                         }}
-                        className="flex-1 h-9 rounded-full bg-up text-black font-bold text-[12px] active:scale-95 transition-all shadow-elevation-2"
+                        className="flex-1 h-10 rounded-md bg-up text-black font-bold text-[12px] active:scale-[0.98] transition-all"
                       >
                         {t('open_long')}
                       </button>
@@ -1810,14 +1810,14 @@ const TradingPage: React.FC<TradingPageProps> = ({
                           setTradeType('futures');
                           setSide('DOWN');
                         }}
-                        className="flex-1 h-9 rounded-full bg-down text-white font-bold text-[12px] active:scale-95 transition-all shadow-elevation-2"
+                        className="flex-1 h-10 rounded-md bg-down text-white font-bold text-[12px] active:scale-[0.98] transition-all"
                       >
                         {t('open_short')}
                       </button>
                       <button
                         type="button"
                         onClick={() => { Haptic.tap(); setActiveTab('TRADE'); }}
-                        className="h-9 w-12 rounded-full bg-surface app-border text-textPrimary text-[11px] font-semibold active:scale-95 transition-all"
+                        className="h-10 w-14 rounded-md bg-surface app-border text-textPrimary text-[11px] font-semibold active:scale-95 transition-all lg:hidden"
                       >
                         {t('show')}
                       </button>
@@ -1937,7 +1937,7 @@ const TradingPage: React.FC<TradingPageProps> = ({
                                 <img
                                   src={asset.nft.imageUrl}
                                   alt=""
-                                  className="h-full w-full object-cover"
+                                  className="h-full w-full object-contain p-1"
                                   loading="lazy"
                                   referrerPolicy="no-referrer"
                                 />

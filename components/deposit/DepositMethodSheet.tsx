@@ -7,6 +7,8 @@ interface DepositMethodSheetProps {
   onClose: () => void;
   onSelectP2P: () => void;
   onSelectCrypto: () => void;
+  onSelectQr: () => void;
+  showQr: boolean;
 }
 
 const iconStroke = {
@@ -21,6 +23,8 @@ const DepositMethodSheet: React.FC<DepositMethodSheetProps> = ({
   open,
   onSelectP2P,
   onSelectCrypto,
+  onSelectQr,
+  showQr,
 }) => {
   if (!open) return null;
 
@@ -32,11 +36,23 @@ const DepositMethodSheet: React.FC<DepositMethodSheetProps> = ({
             Способ пополнения
           </p>
           <p className="mt-1 text-xs text-textSubtle">
-            Выберите P2P или криптовалютный перевод
+            Выберите удобный способ пополнения
           </p>
         </div>
 
         <div className="space-y-2.5 pt-3">
+          {showQr && (
+            <button
+              onClick={() => { Haptic.light(); onSelectQr(); }}
+              className="w-full flex items-center gap-4 rounded-xl border border-neon/15 bg-neon/[0.045] px-4 py-3.5 transition-all duration-200 active:scale-[0.99] hover:bg-neon/[0.07] cursor-pointer"
+            >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-neon bg-neon/10">
+                <svg width="19" height="19" viewBox="0 0 24 24" aria-hidden {...iconStroke}><rect x="3" y="3" width="6" height="6" /><rect x="15" y="3" width="6" height="6" /><rect x="3" y="15" width="6" height="6" /><path d="M15 15h2v2h-2zM19 15h2v6h-6v-2M15 19v2" /></svg>
+              </div>
+              <div className="flex-1 text-left"><div className="flex items-center gap-2 mb-0.5"><span className="font-medium text-textPrimary text-sm">Оплата по QR</span><span className="text-[10px] text-neon bg-neon/10 px-1.5 py-0.5 rounded-full">СБП</span></div><span className="text-xs text-textMuted">Рубли · Автоматическая проверка</span></div>
+              <ChevronRight size={16} strokeWidth={1.5} className="text-textMuted shrink-0" aria-hidden />
+            </button>
+          )}
           <button
             onClick={() => {
               Haptic.light();

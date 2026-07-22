@@ -14,6 +14,7 @@ import { fetchActiveWorkerEvent } from '../lib/services/userService';
 import MarketTopBar from '../components/MarketTopBar';
 import TopSearchControl from '../components/TopSearchControl';
 import AccountBalanceBar from '../components/AccountBalanceBar';
+import NftArtwork from '../components/NftArtwork';
 
 interface HomePageProps {
   balance: number;
@@ -234,20 +235,22 @@ const HomePage: React.FC<HomePageProps> = ({
             onClick={() => { Haptic.tap(); onNavigate('NFT'); }}
           >
             <div className="h-28 sm:h-32 w-full relative">
-               <img 
-                 src="https://i2c.seadn.io/base/0x0085b7172be81d5cba0dc394b728bdc03324a1d5/5104c62e3997adf21ef01ee6c6a73c/f55104c62e3997adf21ef01ee6c6a73c.png" 
+               <NftArtwork
+                 src="https://i2c.seadn.io/base/0x0085b7172be81d5cba0dc394b728bdc03324a1d5/5104c62e3997adf21ef01ee6c6a73c/f55104c62e3997adf21ef01ee6c6a73c.png"
                  alt="Dungeons of Fortune"
-                 className="w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105" 
+                 className="h-full w-full transition-transform duration-700 group-hover:scale-[1.015]"
+                 imageClassName="!p-2"
                />
                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
             </div>
             <div className="px-4 pb-4 -mt-6 relative z-10 flex items-end justify-between">
                <div>
                   <div className="w-12 h-12 rounded-xl bg-surface border-2 border-background overflow-hidden mb-2">
-                     <img 
-                       src="https://i2c.seadn.io/base/0x0085b7172be81d5cba0dc394b728bdc03324a1d5/5104c62e3997adf21ef01ee6c6a73c/f55104c62e3997adf21ef01ee6c6a73c.png" 
-                       alt="Avatar"
-                       className="w-full h-full object-cover object-top" 
+                     <NftArtwork
+                       src="https://i2c.seadn.io/base/0x0085b7172be81d5cba0dc394b728bdc03324a1d5/5104c62e3997adf21ef01ee6c6a73c/f55104c62e3997adf21ef01ee6c6a73c.png"
+                       alt="Dungeons of Fortune"
+                       className="h-full w-full"
+                       imageClassName="!p-0.5"
                      />
                   </div>
                   <h3 className="text-sm font-bold text-textPrimary">Dungeons of Fortune</h3>

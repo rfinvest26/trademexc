@@ -1,4 +1,5 @@
 import React from 'react';
+import NftArtwork from './NftArtwork';
 import { type NftListingRow } from '../lib/nftCatalog';
 import { Haptic } from '../utils/haptics';
 
@@ -48,11 +49,10 @@ const NftHorizontalStrip: React.FC<NftHorizontalStripProps> = ({
               }`}
             >
               <div className="aspect-square relative overflow-hidden bg-surface">
-                <img
+                <NftArtwork
                   src={item.imageUrl}
                   alt={item.codeDisplay}
-                  className="w-full h-full object-cover transition-transform duration-500"
-                  loading="lazy"
+                  className="h-full w-full transition-transform duration-500 group-hover:scale-[1.02]"
                 />
                 {isActive && (
                   <div className="absolute bottom-1.5 left-1.5">

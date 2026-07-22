@@ -20,6 +20,7 @@ import { useLiveAssets } from '../utils/useLiveAssets';
 import Skeleton from '../components/Skeleton';
 import MarketTopBar from '../components/MarketTopBar';
 import TopSearchControl from '../components/TopSearchControl';
+import NftArtwork from '../components/NftArtwork';
 const MARKETS_PRIMARY_TAB_KEY = 'mexc_markets_primary_tab_v3';
 
 type CryptoMarketsSort = 'list' | 'volume' | 'priceAsc' | 'priceDesc' | 'changeDesc' | 'changeAsc';
@@ -490,9 +491,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
                       }}
                       className="nft-card text-left w-full"
                     >
-                      <div className="aspect-square bg-surface">
-                        <img src={hit.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-                      </div>
+                      <NftArtwork src={hit.imageUrl} alt={`${hit.collectionName} ${hit.codeDisplay}`} className="aspect-square" />
                       <div className="p-1.5 min-w-0">
                         <div className="text-[8px] text-textMuted truncate leading-tight">{hit.collectionName}</div>
                         <div className="font-mono text-[11px] font-bold text-textPrimary truncate">{hit.codeDisplay}</div>
@@ -518,9 +517,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
                           }}
                           className="w-full flex items-center gap-3 px-3 py-2.5 text-left active:bg-surfaceElevated transition-colors"
                         >
-                          <div className="h-10 w-10 rounded-lg overflow-hidden bg-surface shrink-0">
-                            <img src={hit.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-                          </div>
+                          <NftArtwork src={hit.imageUrl} alt={`${hit.collectionName} ${hit.codeDisplay}`} className="h-10 w-10 shrink-0 rounded-lg" />
                           <div className="min-w-0 flex-1">
                             <div className="text-[11px] text-textMuted truncate">{hit.collectionName}</div>
                             <div className="font-mono text-[14px] font-bold text-textPrimary">{hit.codeDisplay}</div>
@@ -549,9 +546,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
                         }}
                       >
                         <div className="col-span-5 min-w-0 flex items-center gap-2">
-                          <div className="h-11 w-11 rounded-xl overflow-hidden bg-surface shrink-0">
-                            <img src={col.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-                          </div>
+                          <NftArtwork src={col.coverUrl} alt={col.name} className="h-11 w-11 shrink-0 rounded-lg" />
                           <div className="min-w-0">
                             <div className="text-[14px] font-bold text-textPrimary truncate">{col.name}</div>
                             <div className="text-[11px] text-textSubtle mt-0.5">
@@ -650,9 +645,7 @@ const CoinsPage: React.FC<CoinsPageProps> = ({
                             }}
                             className="snap-start shrink-0 w-[32%] max-w-[104px] text-left rounded-lg overflow-hidden bg-surface hover:bg-surfaceElevated active:scale-[0.99] transition-colors"
                           >
-                            <div className="aspect-square bg-surface">
-                              <img src={hit.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-                            </div>
+                            <NftArtwork src={hit.imageUrl} alt={`${hit.collectionName} ${hit.codeDisplay}`} className="aspect-square" />
                             <div className="px-1 py-1 min-w-0">
                               <div className="text-[7px] text-textMuted truncate leading-tight">{hit.collectionName}</div>
                               <div className="font-mono text-[10px] font-bold text-textPrimary truncate leading-tight">

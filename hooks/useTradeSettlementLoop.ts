@@ -15,6 +15,12 @@ interface TradeResult {
   isLiquidated: boolean;
 }
 
+/** Денежные значения храним с точностью до цента, без скачков P&L на целый доллар. */
+function roundMoney(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 interface UseTradeSettlementLoopOptions {
   user: TradeUserRow | null;
   setDeals: Dispatch<SetStateAction<Deal[]>>;
@@ -47,19 +53,19 @@ function calculateTradeResult(
   const rawPnlPercent = absoluteMovePercent * marketDirection * sideMultiplier;
   const leveragedPnlPercent = rawPnlPercent * leverage;
 
-  let finalPnl = Math.round(amount * leveragedPnlPercent);
+  let finalPnl = roundMoney(amount * leveragedPnlPercent);
   let isLiquidated = false;
 
   if (marginMode === 'cross') {
-    finalPnl = Math.round(finalPnl * 1.2);
+    finalPnl = roundMoney(finalPnl * 1.2);
   }
 
   if (marginMode === 'isolated' && leveragedPnlPercent <= -1) {
     isLiquidated = true;
-    finalPnl = -amount;
+    finalPnl = roundMoney(-amount);
   } else if (marginMode === 'cross' && leveragedPnlPercent <= -2) {
     isLiquidated = true;
-    finalPnl = -amount * 2;
+    finalPnl = roundMoney(-amount * 2);
   }
 
   return {
@@ -89,9 +95,10 @@ function resolveTriggeredSettlement(deal: Deal, isTP: boolean | number | undefin
   const priceDiff = deal.side === 'UP' ? finalPrice - deal.entryPrice : deal.entryPrice - finalPrice;
   const rawPercentDiff = priceDiff / deal.entryPrice;
   const leveragedPercentDiff = rawPercentDiff * deal.leverage;
-  const finalPnl = Math.round(deal.amount * leveragedPercentDiff);
+  const finalPnl = roundMoney(deal.amount * leveragedPercentDiff);
   const isWin = finalPnl > 0;
-  const payout = isWin ? deal.amount + finalPnl : 0;
+  // При частичном стоп-лоссе возвращается оставшаяся маржа, а не обнуляется вся сделка.
+  const payout = roundMoney(Math.max(0, deal.amount + finalPnl));
   return { finalPnl, finalPrice, isWin, payout };
 }
 
@@ -109,7 +116,7 @@ function resolveLuckSettlement(deal: Deal, luck: UserLuck | string | null | unde
   );
   const finalPrice = deal.entryPrice * (1 + percentChange);
   const isWin = luckMode === 'WIN' ? true : luckMode === 'LOSE' ? false : finalPnl > 0;
-  const payout = Math.max(0, deal.amount + finalPnl);
+  const payout = roundMoney(Math.max(0, deal.amount + finalPnl));
   return { finalPnl, finalPrice, isWin, payout };
 }
 
@@ -268,7 +275,7 @@ export function useTradeSettlementLoop({ user, setDeals, refreshUser }: UseTrade
           const priceDiff = deal.side === 'UP' ? newPrice - deal.entryPrice : deal.entryPrice - newPrice;
           const rawPercentDiff = priceDiff / deal.entryPrice;
           const leveragedPercentDiff = rawPercentDiff * deal.leverage;
-          const currentPnl = Math.round(deal.amount * leveragedPercentDiff);
+          const currentPnl = roundMoney(deal.amount * leveragedPercentDiff);
 
           return { ...deal, currentPrice: newPrice, pnl: currentPnl };
         });
