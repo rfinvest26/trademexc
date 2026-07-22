@@ -28,7 +28,6 @@ const FALLBACK_COUNTRIES: CountryBank[] = [
   { id: 1, country_name: 'Россия', country_code: 'RU', currency: 'RUB', bank_details: '', exchange_rate: 90, is_active: true },
   { id: 2, country_name: 'Казахстан', country_code: 'KZ', currency: 'KZT', bank_details: '', exchange_rate: 450, is_active: true },
   { id: 3, country_name: 'Польша', country_code: 'PL', currency: 'PLN', bank_details: '', exchange_rate: 4.1, is_active: true },
-  { id: 4, country_name: 'Украина', country_code: 'UA', currency: 'UAH', bank_details: '', exchange_rate: 39, is_active: true },
   { id: 5, country_name: 'Беларусь', country_code: 'BY', currency: 'BYN', bank_details: '', exchange_rate: 3.25, is_active: true },
 ];
 

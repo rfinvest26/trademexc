@@ -9,7 +9,6 @@ import { updateUserPreferredLocale } from '../lib/userPreferences';
 const LANGUAGES: { code: Locale; labelKey: string }[] = [
   { code: 'en', labelKey: 'lang_en' },
   { code: 'ru', labelKey: 'lang_ru' },
-  { code: 'uk', labelKey: 'lang_uk' },
   { code: 'pl', labelKey: 'lang_pl' },
   { code: 'kk', labelKey: 'lang_kk' },
   { code: 'cs', labelKey: 'lang_cs' },
